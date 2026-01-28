@@ -1,9 +1,23 @@
 import pandas as pd
 import json
+import numpy as np
 
 PRIMARY_HIGHLIGHT_COLOR = '#00C800'
 BASE_COLOR = '#D9D9D6'
 TEXT_COLOR = '#001400'
+
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles NumPy types."""
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        elif isinstance(obj, (np.floating, np.float64, np.float32)):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif pd.isna(obj):
+            return None
+        return super().default(obj)
 
 def scatter_chart_component(
         df: pd.DataFrame,
@@ -109,7 +123,7 @@ def scatter_chart_component(
         </div>
       </div>
       <script>
-        const data = {json.dumps(data)};
+        const data = {json.dumps(data, cls=NumpyEncoder)};
         const df = data.df;
         const xMetric = data.x_metric;
         const yMetric = data.y_metric;
