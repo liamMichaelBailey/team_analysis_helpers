@@ -236,7 +236,12 @@ class PhasesEnricherSplitter:
             raise ValueError(f"Phases missing columns: {sorted(missing_ph)}")
 
         # normalize types
-        de["event_subtype"] = de["event_subtype"].fillna("None")
+        # Robust to Categorical dtype
+        de["event_subtype"] = (
+            de["event_subtype"]
+            .astype("string")  # avoids categorical fillna issues
+            .fillna("None")
+        )
         de["index"] = pd.to_numeric(de["index"], errors="coerce")
         de["frame_start"] = pd.to_numeric(de["frame_start"], errors="coerce")
         de["team_score"] = pd.to_numeric(de["team_score"], errors="coerce")
