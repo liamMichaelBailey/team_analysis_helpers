@@ -134,7 +134,7 @@ class PhasesOfPlayAggregator:
             "team_out_of_possession_phase_type",
         ]
 
-        out_of_possession_phase_aggs = self.phases_of_play_df.groupby(group_by).agg(
+        out_of_possession_phase_aggs = self.phases_of_play_df.groupby(group_by, observed=True).agg(
             count=("team_out_of_possession_phase_type", "count"),
             total_time=("duration", "sum"),
             count_player_possessions=("n_player_possessions_in_phase", "sum"),
@@ -215,7 +215,7 @@ class PhasesOfPlayAggregator:
             "team_in_possession_phase_type",
         ]
 
-        in_possession_phase_aggs = self.phases_of_play_df.groupby(group_by).agg(
+        in_possession_phase_aggs = self.phases_of_play_df.groupby(group_by, observed=True).agg(
             count=("team_in_possession_phase_type", "count"),
             total_time=("duration", "sum"),
             count_player_possessions=("n_player_possessions_in_phase", "sum"),
