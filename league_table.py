@@ -26,7 +26,8 @@ def heatmap_component(
         height: int = 600,
         container_width: int = 1200,
         all_metrics: list = None,
-        default_metrics: list = None
+        default_metrics: list = None,
+        highlight_team: str = None
 ):
     """
     Streamlit custom component for a team performance heatmap.
@@ -57,6 +58,8 @@ def heatmap_component(
         Full list of available metrics for selection panel
     default_metrics : list, optional
         List of metrics selected by default
+    highlight_team : str, optional
+        Team name to highlight with bold text
     """
 
     if all_metrics is None:
@@ -111,7 +114,8 @@ def heatmap_component(
         "rotate_xticks": rotate_xticks,
         "title": title,
         "text_color": text_color,
-        "container_width": container_width
+        "container_width": container_width,
+        "highlight_team": highlight_team
     }
 
     html = f"""
@@ -475,7 +479,7 @@ def heatmap_component(
             const teamCell = document.createElement('td');
             teamCell.className = 'team-name';
             teamCell.textContent = rowData.team;
-            if (rowData.team === 'SC Preußen 06 Münster') {{
+            if (data.highlight_team && rowData.team === data.highlight_team) {{
               teamCell.style.fontWeight = 'bold';
               teamCell.style.fontSize = '12.5px';
             }}
