@@ -124,6 +124,21 @@ def pitch_component(
             (average_pos_df['team_in_possession_phase_type'] == phase)
         ].copy()
 
+    else:
+        average_pos_df = relevant_events.groupby([match_col, 'player_id', 'player_name', 'team_id',
+                                         'team_shortname', 'team_out_of_possession_phase_type',
+                                         'player_position'],observed=True).agg({'x_start': 'mean',
+                                                                  'y_start': 'mean',
+                                                                  'xthreat': 'sum',
+                                                                  'xpass_completion': 'sum',
+                                                                  }).reset_index()
+
+        # Filter for team, phase, and only starters for each specific match
+        avg_filtered = average_pos_df[
+            (average_pos_df['team_id'] == team_in_possession_id) &
+            (average_pos_df['team_out_of_possession_phase_type'] == phase)
+        ].copy()
+
 
     avg_filtered = avg_filtered[
         avg_filtered.apply(
