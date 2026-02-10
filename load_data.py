@@ -52,4 +52,9 @@ def load_data(
             .to_pandas()
         )
 
+    matches_df['match_duration_minutes'] = (
+            matches_df['match_period_1_duration_minutes'] +
+            matches_df['match_period_2_duration_minutes']
+    )
+
     return dynamic_events_df, phases_of_play_df, matches_df, player_performances_df
