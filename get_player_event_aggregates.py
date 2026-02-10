@@ -1,9 +1,16 @@
 import pandas as pd
 
 def get_player_event_aggregates(
-    dynamic_events_df,
-    player_performances_df
+        dynamic_events_df,
+        player_performances_df,
+        date_from,
+        date_to,
 ):
+    dynamic_events_df = dynamic_events_df[
+        (dynamic_events_df['match_date'] >= date_from) &
+        (dynamic_events_df['match_date'] <= date_to)
+        ]
+
     dynamic_events_df['furthest_line_break_info'] = dynamic_events_df['furthest_line_break_type'].astype(str) + '_' + dynamic_events_df['furthest_line_break'].astype(str)
 
 
