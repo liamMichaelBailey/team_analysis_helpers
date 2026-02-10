@@ -73,7 +73,7 @@ def heatmap_component(
 
     all_labels = [m.replace('_', ' ').title() for m in all_metrics]
 
-    df_sorted = df.sort_values(by=sort_by_col).copy()
+    df_sorted = df.sort_values(by=sort_by_col, ascending=False).copy()
 
     team_names = df_sorted[team_name_col].tolist()
 
