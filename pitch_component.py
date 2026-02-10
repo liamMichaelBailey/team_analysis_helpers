@@ -109,19 +109,22 @@ def pitch_component(
     relevant_events = relevant_events.merge(performance_df[['match_id', 'player_id', 'start_time']], on=['match_id', 'player_id'])
     relevant_events = relevant_events[relevant_events['start_time'] == '00:00:00']
 
-    average_pos_df = relevant_events.groupby([match_col, 'player_id', 'player_name', 'team_id',
-                                     'team_shortname', 'team_in_possession_phase_type',
-                                     'player_position'],observed=True).agg({'x_start': 'mean',
-                                                              'y_start': 'mean',
-                                                              'xthreat': 'sum',
-                                                              'xpass_completion': 'sum',
-                                                              }).reset_index()
+    if event_types != ['on_ball_engagement']:
+        average_pos_df = relevant_events.groupby([match_col, 'player_id', 'player_name', 'team_id',
+                                         'team_shortname', 'team_in_possession_phase_type',
+                                         'player_position'],observed=True).agg({'x_start': 'mean',
+                                                                  'y_start': 'mean',
+                                                                  'xthreat': 'sum',
+                                                                  'xpass_completion': 'sum',
+                                                                  }).reset_index()
 
-    # Filter for team, phase, and only starters for each specific match
-    avg_filtered = average_pos_df[
-        (average_pos_df['team_id'] == team_in_possession_id) &
-        (average_pos_df['team_in_possession_phase_type'] == phase)
-    ].copy()
+        # Filter for team, phase, and only starters for each specific match
+        avg_filtered = average_pos_df[
+            (average_pos_df['team_id'] == team_in_possession_id) &
+            (average_pos_df['team_in_possession_phase_type'] == phase)
+        ].copy()
+
+
     avg_filtered = avg_filtered[
         avg_filtered.apply(
             lambda row: row['player_id'] in starter_ids_by_match.get(row[match_col], set()), axis=1
