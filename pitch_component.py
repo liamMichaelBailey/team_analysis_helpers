@@ -20,6 +20,7 @@ def pitch_component(
         performance_df: pd.DataFrame,
         team_in_possession_id,
         phase: str,
+        event_types=None,
         match_col: str = "match_id",
         match_label_col: str = None,
         title: str = "Team Shape",
@@ -82,6 +83,9 @@ def pitch_component(
 
     # SkillCorner pitch: 105x68, centered at 0,0
     # x: -52.5 to 52.5, y: -34 to 34
+    if event_types is None:
+        event_types = ["player_possession", "passing_option"]
+
     pitch_length = 105
     pitch_width = 68
     x_min, x_max = -pitch_length / 2, pitch_length / 2
@@ -101,7 +105,7 @@ def pitch_component(
         starter_ids_by_match[mid] = ids
 
     # Aggregate all events first
-    relevant_events = events_df[events_df['event_type'].isin(['player_possession', 'passing_option'])]
+    relevant_events = events_df[events_df['event_type'].isin(event_types)]
     relevant_events = relevant_events.merge(performance_df[['match_id', 'player_id', 'start_time']], on=['match_id', 'player_id'])
     relevant_events = relevant_events[relevant_events['start_time'] == '00:00:00']
 
