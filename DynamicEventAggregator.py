@@ -949,7 +949,7 @@ class DynamicEventAggregator:
 
         # Apply shared metrics across all contexts in the group
         aggregated_df = (
-            context_df.groupby(group_by + ['context'])
+            context_df.groupby(group_by + ['context'], observed=True)
             .apply(lambda x: pd.Series({metric_name: func(x) for metric_name, func in metrics.items()}))
             .reset_index()
         )
