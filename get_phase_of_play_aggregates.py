@@ -125,6 +125,7 @@ def get_phase_of_play_aggregates(
         'count_finish_phases_per_90',
         'count_direct_phases_per_90',
         'count_transition_phases_per_90',
+        'count_quick_break_phases_per_90',
         'count_chaotic_phases_per_90',
         'avg_width_build_up',
         'avg_length_build_up',
