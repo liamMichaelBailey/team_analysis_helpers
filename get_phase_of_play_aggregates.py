@@ -67,7 +67,7 @@ def get_phase_of_play_aggregates(
         .reset_index()
     )
 
-    for phase in ['build_up', 'create', 'finish', 'direct', 'transition', 'chaotic']:
+    for phase in ['build_up', 'create', 'finish', 'direct', 'transition', 'quick_break', 'chaotic']:
         ip_phase_season_aggs[f'count_{phase}_phases_per_90'] = (
                                                                        ip_phase_season_aggs[f'count_{phase}'] /
                                                                        ip_phase_season_aggs['minutes_played']
