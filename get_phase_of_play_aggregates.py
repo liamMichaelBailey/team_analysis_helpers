@@ -188,12 +188,12 @@ def get_oop_phase_of_play_aggregates(
             total_create_duration=("total_time_medium_block", "sum"),
             total_finish_duration=("total_time_high_block", "sum"),
 
-            count_build_up=("count_low_block", "sum"),
-            count_create=("count_medium_block", "sum"),
-            count_finish=("count_high_block", "sum"),
-            count_direct=("count_defending_direct", "sum"),
-            count_transition=("count_defending_transition", "sum"),
-            count_quick_break=("count_defending_quick_break", "sum"),
+            count_low_block=("count_low_block", "sum"),
+            count_medium_block=("count_medium_block", "sum"),
+            count_high_block=("count_high_block", "sum"),
+            count_defending_direct=("count_defending_direct", "sum"),
+            count_defending_transition=("count_defending_transition", "sum"),
+            count_defending_quick_break=("count_defending_quick_break", "sum"),
             count_chaotic=("count_chaotic", "sum"),
 
             # Low Block metrics.
