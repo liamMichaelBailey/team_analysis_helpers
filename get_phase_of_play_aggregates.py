@@ -243,14 +243,14 @@ def get_oop_phase_of_play_aggregates(
                                                                             oop_phase_season_aggs[
                                                                                 'count_into_build_up_from_low_block'] /
                                                                             oop_phase_season_aggs[
-                                                                                'count_low_block']
+                                                                                'count_regain_in_low_block']
                                                                             ) * 100
 
     oop_phase_season_aggs['progressed_to_transition_from_low_block_percentage'] = (
                                                                             oop_phase_season_aggs[
                                                                                 'count_into_transition_from_low_block'] /
                                                                             oop_phase_season_aggs[
-                                                                                'count_low_block']
+                                                                                'count_regain_in_low_block']
                                                                             ) * 100
 
     oop_phase_season_aggs['conceded_shot_in_low_block_percentage'] = (
@@ -264,14 +264,14 @@ def get_oop_phase_of_play_aggregates(
                                                                             oop_phase_season_aggs[
                                                                                 'count_into_create_from_medium_block'] /
                                                                             oop_phase_season_aggs[
-                                                                                'count_medium_block']
+                                                                                'count_regain_in_medium_block']
                                                                             ) * 100
 
     oop_phase_season_aggs['progressed_to_transition_from_medium_block_percentage'] = (
                                                                             oop_phase_season_aggs[
                                                                                 'count_into_transition_from_medium_block'] /
                                                                             oop_phase_season_aggs[
-                                                                                'count_medium_block']
+                                                                                'count_regain_in_medium_block']
                                                                             ) * 100
 
     oop_phase_season_aggs['progressed_to_low_block_from_medium_block_percentage'] = (
@@ -292,14 +292,14 @@ def get_oop_phase_of_play_aggregates(
                                                                             oop_phase_season_aggs[
                                                                                 'count_into_finish_from_high_block'] /
                                                                             oop_phase_season_aggs[
-                                                                                'count_high_block']
+                                                                                'count_regain_in_high_block']
                                                                             ) * 100
 
     oop_phase_season_aggs['progressed_to_quick_break_from_high_block_percentage'] = (
                                                                             oop_phase_season_aggs[
                                                                                 'count_into_quick_break_from_high_block'] /
                                                                             oop_phase_season_aggs[
-                                                                                'count_high_block']
+                                                                                'count_regain_in_high_block']
                                                                             ) * 100
 
     oop_phase_season_aggs['progressed_to_medium_block_from_high_block_percentage'] = (
