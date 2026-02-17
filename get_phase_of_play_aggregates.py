@@ -1,7 +1,7 @@
 from PhaseOfPlayAggregator import PhasesOfPlayAggregator
 
 
-def get_phase_of_play_aggregates(
+def get_ip_phase_of_play_aggregates(
         phases_of_play_df,
         matches_df,
         date_from,
@@ -151,5 +151,202 @@ def get_phase_of_play_aggregates(
         )
 
     return ip_phase_season_aggs
+
+from PhaseOfPlayAggregator import PhasesOfPlayAggregator
+
+
+def get_oop_phase_of_play_aggregates(
+        phases_of_play_df,
+        matches_df,
+        date_from,
+        date_to
+):
+    phases_of_play_df = phases_of_play_df[
+        (phases_of_play_df['match_date'] >= date_from) &
+        (phases_of_play_df['match_date'] <= date_to)
+    ]
+
+    pop_aggregator = PhasesOfPlayAggregator(phases_of_play_df=phases_of_play_df)
+
+    oop_phase_match_aggs = pop_aggregator.get_out_of_possession_aggregates()
+    oop_phase_match_aggs['match_duration_minutes'] = oop_phase_match_aggs['match_id'].map(
+        dict(zip(matches_df['match_id'],
+                 matches_df['match_duration_minutes']))
+    )
+
+    oop_phase_season_aggs = (
+        oop_phase_match_aggs
+        .groupby([
+            "team_out_of_possession_id",
+            "team_out_of_possession_shortname"],
+            observed=True
+        )
+        .agg(
+            n_matches=("match_id", "nunique"),
+            minutes_played=("match_duration_minutes", "sum"),
+            total_build_up_duration=("total_time_low_block", "sum"),
+            total_create_duration=("total_time_medium_block", "sum"),
+            total_finish_duration=("total_time_high_block", "sum"),
+
+            count_build_up=("count_low_block", "sum"),
+            count_create=("count_medium_block", "sum"),
+            count_finish=("count_high_block", "sum"),
+            count_direct=("count_defending_direct", "sum"),
+            count_transition=("count_defending_transition", "sum"),
+            count_quick_break=("count_defending_quick_break", "sum"),
+            count_chaotic=("count_chaotic", "sum"),
+
+            # Low Block metrics.
+            count_into_build_up_from_low_block=("count_into_build_up_from_low_block", "sum"),
+            count_into_transition_from_low_block=("count_into_transition_from_low_block", "sum"),
+            count_regain_in_low_block=("count_possession_lost_in_phase_low_block", "sum"),
+            count_conceded_shot_low_block=("count_possession_lead_to_shot_low_block", "sum"),
+            avg_width_low_block=("avg_end_width_low_block", "mean"),
+            avg_length_low_block=("avg_end_length_low_block", "mean"),
+
+            # Create metrics.
+            count_into_create_from_medium_block=("count_into_create_from_medium_block", "sum"),
+            count_into_transition_from_medium_block=("count_into_transition_from_medium_block", "sum"),
+            count_into_low_block_from_medium_block=("count_into_low_block_from_medium_block", "sum"),
+            count_into_high_block_from_medium_block=("count_into_high_block_from_medium_block", "sum"),
+            count_regain_in_medium_block=("count_possession_lost_in_phase_medium_block", "sum"),
+            avg_width_medium_block=("avg_end_width_high_block", "mean"),
+            avg_length_medium_block=("avg_end_length_high_block", "mean"),
+
+            # Finish metrics.
+            count_into_finish_from_high_block=("count_into_finish_from_high_block", "sum"),
+            count_into_quick_break_from_high_block=("count_into_quick_break_from_high_block", "sum"),
+            count_into_medium_block_from_high_block=("count_into_medium_block_from_high_block", "sum"),
+            count_regain_in_high_block=("count_possession_lost_in_phase_high_block", "sum"),
+            avg_width_high_block=("avg_end_width_high_block", "mean"),
+            avg_length_high_block=("avg_end_length_high_block", "mean"),
+
+        )
+        .reset_index()
+    )
+
+    for phase in ['low_block', 'medium_block', 'high_block', 'defending_direct', 'defending_transition',
+                  'defending_quick_break', 'chaotic']:
+        oop_phase_season_aggs[f'count_{phase}_phases_per_90'] = (
+                                                               oop_phase_season_aggs[f'count_{phase}'] /
+                                                               oop_phase_season_aggs['minutes_played']
+                                                               ) * 90
+
+    for phase in ['low_block', 'medium_block', 'high_block']:
+        oop_phase_season_aggs[f'regain_in_{phase}_percentage'] = (
+                                                                                 oop_phase_season_aggs[
+                                                                                     f'count_regain_in_{phase}'] /
+                                                                                 oop_phase_season_aggs[f'count_{phase}']
+                                                                         ) * 100
+
+    oop_phase_season_aggs['progressed_to_build_up_from_low_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_build_up_from_low_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_low_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_transition_from_low_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_transition_from_low_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_low_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['conceded_shot_in_low_block_percentage'] = (
+                                                                    oop_phase_season_aggs[
+                                                                        'count_conceded_shot_low_block'] /
+                                                                    oop_phase_season_aggs[
+                                                                        'count_low_block']
+                                                                    ) * 100
+
+    oop_phase_season_aggs['progressed_to_create_from_medium_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_create_from_medium_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_medium_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_transition_from_medium_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_transition_from_medium_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_medium_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_low_block_from_medium_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_low_block_from_medium_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_medium_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_high_block_from_medium_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_high_block_from_medium_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_medium_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_finish_from_high_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_finish_from_high_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_high_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_quick_break_from_high_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_quick_break_from_high_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_high_block']
+                                                                            ) * 100
+
+    oop_phase_season_aggs['progressed_to_medium_block_from_high_block_percentage'] = (
+                                                                            oop_phase_season_aggs[
+                                                                                'count_into_medium_block_from_high_block'] /
+                                                                            oop_phase_season_aggs[
+                                                                                'count_high_block']
+                                                                            ) * 100
+
+    metrics = [
+        'count_low_block_phases_per_90',
+        'count_medium_block_phases_per_90',
+        'count_high_block_phases_per_90',
+        'count_defending_direct_phases_per_90',
+        'count_defending_transition_phases_per_90',
+        'count_defending_quick_break_phases_per_90',
+        'count_chaotic_phases_per_90',
+        'avg_width_low_block',
+        'avg_length_low_block',
+        'avg_width_medium_block',
+        'avg_length_medium_block',
+        'avg_width_high_block',
+        'avg_length_high_block',
+        'regain_in_low_block_percentage',
+        'regain_in_medium_block_percentage',
+        'regain_in_high_block_percentage',
+        'progressed_to_build_up_from_low_block_percentage',
+        'progressed_to_transition_from_low_block_percentage',
+        'conceded_shot_in_low_block_percentage',
+        'progressed_to_create_from_medium_block_percentage',
+        'progressed_to_transition_from_medium_block_percentage',
+        'progressed_to_low_block_from_medium_block_percentage',
+        'progressed_to_high_block_from_medium_block_percentage',
+        'progressed_to_finish_from_high_block_percentage',
+        'progressed_to_quick_break_from_high_block_percentage',
+        'progressed_to_medium_block_from_high_block_percentage'
+    ]
+
+    for m in metrics:
+        oop_phase_season_aggs[m + '_competition_score'] = (
+                (oop_phase_season_aggs[m] - oop_phase_season_aggs[m].mean())
+                / oop_phase_season_aggs[m].std()
+        )
+
+    return oop_phase_season_aggs
+
+
+
 
 
