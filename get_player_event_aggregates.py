@@ -111,11 +111,7 @@ def get_player_event_aggregates(
         on=['player_id', 'player_name', 'team_id', 'team_shortname', 'phase_type']
     )
 
-    player_de_aggs = pd.merge(
-        left=player_de_aggs,
-        right=obe_de_aggs,
-        on=['player_id', 'player_name', 'team_id', 'team_shortname', 'phase_type']
-    )
+    player_de_aggs = pd.concat([player_de_aggs, obe_de_aggs], ignore_index=True)
 
     player_performance_aggs = \
     player_performances_df[player_performances_df['match_id'].isin(dynamic_events_df['match_id'].unique())].groupby(
