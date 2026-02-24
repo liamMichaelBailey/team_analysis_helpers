@@ -72,14 +72,14 @@ def get_player_event_aggregates(
             dynamic_events_df['event_type'] == 'on_ball_engagement'
         ].groupby(['player_id', 'player_name', 'team_id', 'team_shortname', 'team_out_of_possession_phase_type'], observed=True)
           .agg(
-              count_cross_receiver_runs=("event_type", lambda s: (s == "on_ball_engagement").sum()),
-              count_runs_in_behind=("event_subtype", lambda s: (s == "pressing").sum()),
-              count_runs_ahead_of_the_ball=("event_subtype", lambda s: (s == "pressure").sum()),
-              count_support_runs=("event_subtype", lambda s: (s == "counter_press").sum()),
-              count_overlap_runs=("event_subtype", lambda s: (s == "recovery_press").sum()),
+              count_on_ball_engagements=("event_type", lambda s: (s == "on_ball_engagement").sum()),
+              count_pressing_engagements=("event_subtype", lambda s: (s == "pressing").sum()),
+              count_pressure_engagements=("event_subtype", lambda s: (s == "pressure").sum()),
+              count_counter_press_engagements=("event_subtype", lambda s: (s == "counter_press").sum()),
+              count_recovery_press_engagements=("event_subtype", lambda s: (s == "recovery_press").sum()),
 
-              count_regains=("end_type", lambda s: ((s == "direct_regain") or (s == 'indirect_regain')).sum()),
-              count_disruptions=("end_type", lambda s: ((s == "direct_disruption") or (s == 'indirect_disruption')).sum()),
+              count_regains=("end_type", lambda s: ((s == "direct_regain") | (s == 'indirect_regain')).sum()),
+              count_disruptions=("end_type", lambda s: ((s == "direct_disruption") | (s == 'indirect_disruption')).sum()),
               count_fouls=("end_type", lambda s: (s == "foul").sum()),
 
               count_reduce_possession_danger=("reduce_possession_danger", lambda s: (s == True).sum()),
