@@ -67,15 +67,54 @@ def get_player_event_aggregates(
           .reset_index()
     )
 
+    obe_de_aggs = (
+        dynamic_events_df[
+            dynamic_events_df['event_type'] == 'on_ball_engagement'
+        ].groupby(['player_id', 'player_name', 'team_id', 'team_shortname', 'team_out_of_possession_phase_type'], observed=True)
+          .agg(
+              count_cross_receiver_runs=("event_type", lambda s: (s == "on_ball_engagement").sum()),
+              count_runs_in_behind=("event_subtype", lambda s: (s == "pressing").sum()),
+              count_runs_ahead_of_the_ball=("event_subtype", lambda s: (s == "pressure").sum()),
+              count_support_runs=("event_subtype", lambda s: (s == "counter_press").sum()),
+              count_overlap_runs=("event_subtype", lambda s: (s == "recovery_press").sum()),
+
+              count_regains=("end_type", lambda s: ((s == "direct_regain") or (s == 'indirect_regain')).sum()),
+              count_disruptions=("end_type", lambda s: ((s == "direct_disruption") or (s == 'indirect_disruption')).sum()),
+              count_fouls=("end_type", lambda s: (s == "foul").sum()),
+
+              count_reduce_possession_danger=("reduce_possession_danger", lambda s: (s == True).sum()),
+              count_stop_possession_danger=("stop_possession_danger", lambda s: (s == True).sum()),
+              count_force_backward=("force_backward", lambda s: (s == True).sum()),
+              count_beaten_by_possession=("beaten_by_possession", lambda s: (s == True).sum()),
+              count_beaten_by_movement=("beaten_by_movement", lambda s: (s == True).sum()),
+        )
+          .reset_index()
+    )
+
     passing_de_aggs = passing_de_aggs.rename(columns={
         'player_in_possession_id': 'player_id',
-        'player_in_possession_name': 'player_name'
-        })
+        'player_in_possession_name': 'player_name',
+        'team_in_possession_phase_type': 'phase_type',
+    })
+
+    movement_de_aggs = movement_de_aggs.rename(columns={
+        'team_in_possession_phase_type': 'phase_type',
+    })
+
+    obe_de_aggs  = obe_de_aggs.rename(columns={
+        'team_out_of_possession_phase_type': 'phase_type',
+    })
 
     player_de_aggs = pd.merge(
         left=movement_de_aggs,
         right=passing_de_aggs,
-        on=['player_id', 'player_name', 'team_id', 'team_shortname', 'team_in_possession_phase_type']
+        on=['player_id', 'player_name', 'team_id', 'team_shortname', 'phase_type']
+    )
+
+    player_de_aggs = pd.merge(
+        left=player_de_aggs,
+        right=obe_de_aggs,
+        on=['player_id', 'player_name', 'team_id', 'team_shortname', 'phase_type']
     )
 
     player_performance_aggs = \
