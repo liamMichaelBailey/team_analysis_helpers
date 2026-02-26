@@ -31,18 +31,22 @@ def off_ball_run_component(
         highlight_entity: str = None,
         pitch_width_px: int = 280,
         pitch_height_px: int = 185,
-        cols_per_row: int = 3
+        cols_per_row: int = 3,
+        player_col: str = "player_name",
+        bar_chart_width: int = 180,
 ):
     """
     Streamlit custom component for dangerous off-ball runs heatmap on a football pitch.
-    For each match, creates 3 sub-plots: All runs, Targeted runs, Received runs.
-    Bins event locations into a grid and shows density per zone.
+    For each match, creates 3 sub-plots: All runs, Targeted runs, Received runs,
+    plus a 4th column with a horizontal bar chart of player run counts.
+    Clicking heatmap cells filters the bar chart to show players from selected zones.
+    Multiple cells can be selected across any heatmap. By default shows all player totals.
 
     Parameters:
     -----------
     events_df : pd.DataFrame
         Raw events DataFrame with columns: event_type, x_start, y_start, team_id,
-        match_id, is_targeted_run (bool), is_received_run (bool)
+        match_id, targeted (bool), received (bool), player_name
     team_id : int/str
         The team_id to filter events for.
     phase : str, optional
@@ -54,7 +58,9 @@ def off_ball_run_component(
     match_date_col : str
         Column name for match date, used for sorting.
     event_type_filter : str
-        Event type to filter on (default: 'dangerous_off_ball_run').
+        Event type to filter on (default: 'off_ball_run').
+    dangerous_filter : bool
+        Filter for dangerous runs.
     grid_cols : int
         Number of columns in the heatmap grid (along pitch length).
     grid_rows : int
@@ -70,7 +76,11 @@ def off_ball_run_component(
     pitch_height_px : int
         Height of each pitch in pixels.
     cols_per_row : int
-        Number of match groups per row (each group has 3 pitches).
+        Number of match groups per row (each group has 3 pitches + bar chart).
+    player_col : str
+        Column name for player names.
+    bar_chart_width : int
+        Width of the player bar chart in pixels.
     """
 
     # SkillCorner pitch: 105x68, centered at 0,0
@@ -105,12 +115,11 @@ def off_ball_run_component(
     if match_label_col is None:
         match_label_col = match_col
 
-    # Grid bin edges
-    x_edges = np.linspace(x_min, x_max, grid_cols + 1)
-    y_edges = np.linspace(y_min, y_max, grid_rows + 1)
+    has_player_col = player_col in filtered.columns
 
-    def bin_events(df_subset):
+    def bin_events_with_players(df_subset):
         grid = np.zeros((grid_rows, grid_cols), dtype=int)
+        cell_players = {}
         for _, row in df_subset.iterrows():
             x_val = row['x_start']
             y_val = row['y_start']
@@ -121,7 +130,13 @@ def off_ball_run_component(
             col_idx = min(col_idx, grid_cols - 1)
             row_idx = min(row_idx, grid_rows - 1)
             grid[row_idx][col_idx] += 1
-        return grid
+            if has_player_col:
+                key = f"{row_idx}_{col_idx}"
+                player = str(row[player_col]) if pd.notna(row[player_col]) else "Unknown"
+                if key not in cell_players:
+                    cell_players[key] = {}
+                cell_players[key][player] = cell_players[key].get(player, 0) + 1
+        return grid, cell_players
 
     # Build data per match
     match_data = []
@@ -137,27 +152,30 @@ def off_ball_run_component(
         else:
             match_label = str(match_id)
 
-        # All runs
-        grid_all = bin_events(match_events)
+        grid_all, players_all = bin_events_with_players(match_events)
 
-        # Targeted runs
         if 'targeted' in match_events.columns:
             targeted = match_events[match_events['targeted'] == True]
         else:
             targeted = pd.DataFrame()
-        grid_targeted = bin_events(targeted)
+        grid_targeted, players_targeted = bin_events_with_players(targeted)
 
-        # Received runs
         if 'received' in match_events.columns:
             received = match_events[match_events['received'] == True]
         else:
             received = pd.DataFrame()
-        grid_received = bin_events(received)
+        grid_received, players_received = bin_events_with_players(received)
 
         for g in [grid_all, grid_targeted, grid_received]:
             local_max = int(g.max())
             if local_max > global_max:
                 global_max = local_max
+
+        # Total player counts for default bar chart view
+        total_players = {}
+        for cell_data in players_all.values():
+            for player, count in cell_data.items():
+                total_players[player] = total_players.get(player, 0) + count
 
         match_data.append({
             "match_id": str(match_id),
@@ -167,7 +185,13 @@ def off_ball_run_component(
             "grid_received": grid_received.tolist(),
             "total_all": int(grid_all.sum()),
             "total_targeted": int(grid_targeted.sum()),
-            "total_received": int(grid_received.sum())
+            "total_received": int(grid_received.sum()),
+            "players": {
+                "all": players_all,
+                "targeted": players_targeted,
+                "received": players_received,
+            },
+            "total_players": total_players,
         })
 
     data = {
@@ -184,7 +208,8 @@ def off_ball_run_component(
         "x_min": x_min,
         "x_max": x_max,
         "y_min": y_min,
-        "y_max": y_max
+        "y_max": y_max,
+        "bar_chart_width": bar_chart_width,
     }
 
     html = f"""
@@ -225,6 +250,7 @@ def off_ball_run_component(
         .pitches-row {{
           display: flex;
           gap: 6px;
+          align-items: flex-start;
         }}
         .pitch-wrapper {{
           display: flex;
@@ -268,6 +294,7 @@ def off_ball_run_component(
         .pitch-download:hover {{ transform: scale(1.1); }}
         canvas {{
           border-radius: 3px;
+          cursor: pointer;
         }}
         .download-btn {{
           width: 28px;
@@ -284,6 +311,76 @@ def off_ball_run_component(
           margin-bottom: 8px;
         }}
         .download-btn:hover {{ transform: scale(1.1); }}
+
+        /* Bar chart styles */
+        .bar-chart-wrapper {{
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+        }}
+        .bar-chart-scroll {{
+          overflow-y: auto;
+          overflow-x: hidden;
+        }}
+        .bar-chart-scroll::-webkit-scrollbar {{
+          width: 3px;
+        }}
+        .bar-chart-scroll::-webkit-scrollbar-thumb {{
+          background: #ccc;
+          border-radius: 2px;
+        }}
+        .bar-row {{
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 1.5px 0;
+        }}
+        .bar-name {{
+          font-size: 9px;
+          color: {text_color};
+          width: 65px;
+          text-overflow: ellipsis;
+          overflow: hidden;
+          white-space: nowrap;
+          text-align: right;
+          flex-shrink: 0;
+        }}
+        .bar-track {{
+          flex: 1;
+          height: 10px;
+          background: #f0f0f0;
+          border-radius: 2px;
+          overflow: hidden;
+        }}
+        .bar-fill {{
+          height: 100%;
+          background: {primary_color};
+          border-radius: 2px;
+          transition: width 0.2s;
+        }}
+        .bar-count {{
+          font-size: 9px;
+          color: #888;
+          width: 18px;
+          text-align: right;
+          flex-shrink: 0;
+        }}
+        .bar-chart-footer {{
+          font-size: 9px;
+          color: #888;
+          margin-top: 2px;
+          text-align: center;
+          min-height: 13px;
+        }}
+        .bar-chart-clear {{
+          color: {primary_color};
+          cursor: pointer;
+          text-decoration: underline;
+          margin-left: 4px;
+        }}
+        .bar-chart-clear:hover {{
+          opacity: 0.7;
+        }}
       </style>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     </head>
@@ -299,6 +396,7 @@ def off_ball_run_component(
         const dpr = 4;
         const PW = data.pitch_width_px;
         const PH = data.pitch_height_px;
+        const BCW = data.bar_chart_width;
 
         const xMin = data.x_min;
         const xMax = data.x_max;
@@ -311,6 +409,9 @@ def off_ball_run_component(
         const padBottom = 8;
         const canvasW = PW + padLeft + padRight;
         const canvasH = PH + padTop + padBottom;
+
+        // Per-match interaction state
+        const matchStates = [];
 
         function hexToRgb(hex) {{
           const result = /^#?([a-f\\d]{{2}})([a-f\\d]{{2}})([a-f\\d]{{2}})$/i.exec(hex);
@@ -424,7 +525,133 @@ def off_ball_run_component(
           }}
         }}
 
-        function createPitchCanvas(gridData, subtitle, total) {{
+        function drawSelectionHighlight(ctx, selectedCells, gridType) {{
+          const cellW = PW / data.grid_cols;
+          const cellH = PH / data.grid_rows;
+
+          selectedCells.forEach(function(cellKey) {{
+            const parts = cellKey.split('_');
+            const type = parts[0];
+            if (type !== gridType) return;
+            const r = parseInt(parts[1]);
+            const c = parseInt(parts[2]);
+
+            const x = padLeft + c * cellW;
+            const y = padTop + (data.grid_rows - 1 - r) * cellH;
+
+            // White inner border + dark outer for contrast on any background
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4);
+            ctx.strokeStyle = data.text_color;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4);
+          }});
+        }}
+
+        function redrawCanvas(canvas, gridData, gridType, matchIdx) {{
+          const ctx = canvas.getContext('2d');
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvasW, canvasH);
+          drawPitch(ctx);
+          drawHeatmapGrid(ctx, gridData, data.global_max);
+          drawSelectionHighlight(ctx, matchStates[matchIdx].selectedCells, gridType);
+        }}
+
+        function redrawMatch(matchIdx) {{
+          const state = matchStates[matchIdx];
+          const md = data.matches[matchIdx];
+          redrawCanvas(state.canvases.all, md.grid_all, 'all', matchIdx);
+          redrawCanvas(state.canvases.targeted, md.grid_targeted, 'targeted', matchIdx);
+          redrawCanvas(state.canvases.received, md.grid_received, 'received', matchIdx);
+        }}
+
+        function getSelectedPlayerCounts(matchIdx) {{
+          const state = matchStates[matchIdx];
+          const md = data.matches[matchIdx];
+
+          if (state.selectedCells.size === 0) {{
+            return md.total_players;
+          }}
+
+          const counts = {{}};
+          state.selectedCells.forEach(function(cellKey) {{
+            const parts = cellKey.split('_');
+            const type = parts[0];
+            const r = parts[1];
+            const c = parts[2];
+            const playerKey = r + '_' + c;
+            const cellPlayers = (md.players[type] || {{}})[playerKey] || {{}};
+            for (const [player, count] of Object.entries(cellPlayers)) {{
+              counts[player] = (counts[player] || 0) + count;
+            }}
+          }});
+          return counts;
+        }}
+
+        function updateBarChart(matchIdx) {{
+          const state = matchStates[matchIdx];
+          const counts = getSelectedPlayerCounts(matchIdx);
+          const scroll = state.barChartEl;
+          const footer = state.footerEl;
+
+          const sorted = Object.entries(counts).sort(function(a, b) {{ return b[1] - a[1]; }});
+          const maxCount = sorted.length > 0 ? sorted[0][1] : 0;
+
+          scroll.innerHTML = '';
+
+          if (sorted.length === 0) {{
+            scroll.innerHTML = '<div style="font-size:9px;color:#888;padding:8px;text-align:center;">No runs</div>';
+          }} else {{
+            sorted.forEach(function(entry) {{
+              const player = entry[0];
+              const count = entry[1];
+
+              const row = document.createElement('div');
+              row.className = 'bar-row';
+
+              const name = document.createElement('div');
+              name.className = 'bar-name';
+              name.textContent = player;
+              name.title = player;
+
+              const track = document.createElement('div');
+              track.className = 'bar-track';
+
+              const fill = document.createElement('div');
+              fill.className = 'bar-fill';
+              fill.style.width = (maxCount > 0 ? (count / maxCount * 100) : 0) + '%';
+              track.appendChild(fill);
+
+              const countEl = document.createElement('div');
+              countEl.className = 'bar-count';
+              countEl.textContent = count;
+
+              row.appendChild(name);
+              row.appendChild(track);
+              row.appendChild(countEl);
+              scroll.appendChild(row);
+            }});
+          }}
+
+          // Update footer status
+          if (state.selectedCells.size === 0) {{
+            footer.innerHTML = '<span style="color:#888;">All Runs</span>';
+          }} else {{
+            const n = state.selectedCells.size;
+            footer.innerHTML = '<span style="color:#888;">' + n + ' zone' + (n > 1 ? 's' : '') + ' selected</span>'
+              + ' <span class="bar-chart-clear" onclick="clearSelection(' + matchIdx + ')">clear</span>';
+          }}
+        }}
+
+        function clearSelection(matchIdx) {{
+          matchStates[matchIdx].selectedCells.clear();
+          redrawMatch(matchIdx);
+          updateBarChart(matchIdx);
+        }}
+
+        function createPitchCanvas(gridData, subtitle, total, gridType, matchIdx) {{
           const wrapper = document.createElement('div');
           wrapper.className = 'pitch-wrapper';
 
@@ -450,6 +677,35 @@ def off_ball_run_component(
           drawPitch(ctx);
           drawHeatmapGrid(ctx, gridData, data.global_max);
 
+          // Click handler for cell selection
+          canvas.addEventListener('click', function(e) {{
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const pitchX = x - padLeft;
+            const pitchY = y - padTop;
+            if (pitchX < 0 || pitchX >= PW || pitchY < 0 || pitchY >= PH) return;
+
+            const cellW = PW / data.grid_cols;
+            const cellH = PH / data.grid_rows;
+            const col = Math.min(Math.floor(pitchX / cellW), data.grid_cols - 1);
+            const visualRow = Math.min(Math.floor(pitchY / cellH), data.grid_rows - 1);
+            const gridRow = data.grid_rows - 1 - visualRow;
+
+            const cellKey = gridType + '_' + gridRow + '_' + col;
+            const state = matchStates[matchIdx];
+
+            if (state.selectedCells.has(cellKey)) {{
+              state.selectedCells.delete(cellKey);
+            }} else {{
+              state.selectedCells.add(cellKey);
+            }}
+
+            redrawMatch(matchIdx);
+            updateBarChart(matchIdx);
+          }});
+
           const totalEl = document.createElement('div');
           totalEl.className = 'pitch-total';
           totalEl.textContent = total + ' runs';
@@ -458,7 +714,33 @@ def off_ball_run_component(
           return wrapper;
         }}
 
-        function renderMatchGroup(matchData) {{
+        function createBarChart(matchIdx) {{
+          const wrapper = document.createElement('div');
+          wrapper.className = 'bar-chart-wrapper';
+          wrapper.style.width = BCW + 'px';
+
+          const title = document.createElement('div');
+          title.className = 'pitch-subtitle';
+          title.textContent = 'Players';
+          wrapper.appendChild(title);
+
+          const scroll = document.createElement('div');
+          scroll.className = 'bar-chart-scroll';
+          scroll.style.height = canvasH + 'px';
+          wrapper.appendChild(scroll);
+
+          const footer = document.createElement('div');
+          footer.className = 'bar-chart-footer';
+          wrapper.appendChild(footer);
+
+          matchStates[matchIdx].barChartEl = scroll;
+          matchStates[matchIdx].footerEl = footer;
+
+          updateBarChart(matchIdx);
+          return wrapper;
+        }}
+
+        function renderMatchGroup(matchData, matchIdx) {{
           const group = document.createElement('div');
           group.className = 'match-group';
 
@@ -470,7 +752,7 @@ def off_ball_run_component(
           dlBtn.onclick = function(e) {{
             e.stopPropagation();
             dlBtn.style.visibility = 'hidden';
-            html2canvas(group, {{ scale: 4, useCORS: true, backgroundColor: '#ffffff' }}).then(c => {{
+            html2canvas(group, {{ scale: 4, useCORS: true, backgroundColor: '#ffffff' }}).then(function(c) {{
               const link = document.createElement('a');
               link.href = c.toDataURL('image/png');
               link.download = 'runs_' + matchData.label.replace(/[^a-zA-Z0-9]/g, '_') + '.png';
@@ -491,17 +773,34 @@ def off_ball_run_component(
           const row = document.createElement('div');
           row.className = 'pitches-row';
 
-          row.appendChild(createPitchCanvas(matchData.grid_all, 'All', matchData.total_all));
-          row.appendChild(createPitchCanvas(matchData.grid_targeted, 'Targeted', matchData.total_targeted));
-          row.appendChild(createPitchCanvas(matchData.grid_received, 'Received', matchData.total_received));
+          const allWrapper = createPitchCanvas(matchData.grid_all, 'All', matchData.total_all, 'all', matchIdx);
+          matchStates[matchIdx].canvases.all = allWrapper.querySelector('canvas');
+          row.appendChild(allWrapper);
+
+          const targetedWrapper = createPitchCanvas(matchData.grid_targeted, 'Targeted', matchData.total_targeted, 'targeted', matchIdx);
+          matchStates[matchIdx].canvases.targeted = targetedWrapper.querySelector('canvas');
+          row.appendChild(targetedWrapper);
+
+          const receivedWrapper = createPitchCanvas(matchData.grid_received, 'Received', matchData.total_received, 'received', matchIdx);
+          matchStates[matchIdx].canvases.received = receivedWrapper.querySelector('canvas');
+          row.appendChild(receivedWrapper);
+
+          row.appendChild(createBarChart(matchIdx));
 
           group.appendChild(row);
           return group;
         }}
 
         // Render all matches
-        data.matches.forEach(matchData => {{
-          const group = renderMatchGroup(matchData);
+        data.matches.forEach(function(matchData, matchIdx) {{
+          matchStates.push({{
+            selectedCells: new Set(),
+            canvases: {{}},
+            barChartEl: null,
+            footerEl: null
+          }});
+
+          const group = renderMatchGroup(matchData, matchIdx);
           matchesGrid.appendChild(group);
         }});
 
@@ -512,7 +811,7 @@ def off_ball_run_component(
             scale: 5,
             useCORS: true,
             backgroundColor: '#ffffff'
-          }}).then(sourceCanvas => {{
+          }}).then(function(sourceCanvas) {{
             const targetWidth = 3840;
             const targetHeight = 2160;
 
