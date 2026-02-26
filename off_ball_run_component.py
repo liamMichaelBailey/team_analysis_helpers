@@ -23,6 +23,7 @@ def off_ball_run_component(
         match_label_col: str = None,
         match_date_col: str = "match_date",
         event_type_filter: str = "off_ball_run",
+        event_subtypes: list = None,
         dangerous_filter: bool = True,
         grid_cols: int = None,
         grid_rows: int = None,
@@ -117,6 +118,17 @@ def off_ball_run_component(
     y_breaks_arr = np.array(y_breaks)
 
     # ----------------------------------------------------------------
+    # Default event_subtypes to all known off-ball run subtypes
+    # ----------------------------------------------------------------
+    ALL_SUBTYPES = [
+        "behind", "run_ahead_of_the_ball", "support", "overlap",
+        "underlap", "coming_short", "pulling_half_space", "pulling_wide",
+        "dropping_off", "cross_receiver",
+    ]
+    if event_subtypes is None:
+        event_subtypes = ALL_SUBTYPES
+
+    # ----------------------------------------------------------------
     # Filter events for the target team
     # ----------------------------------------------------------------
     mask = ((events_df['event_type'] == event_type_filter) &
@@ -124,6 +136,8 @@ def off_ball_run_component(
             (events_df['team_id'] == team_id))
     if phase is not None and 'team_in_possession_phase_type' in events_df.columns:
         mask = mask & (events_df['team_in_possession_phase_type'] == phase)
+    if 'event_subtype' in events_df.columns:
+        mask = mask & (events_df['event_subtype'].isin(event_subtypes))
     filtered = events_df[mask].copy()
 
     # Sort matches by date descending
@@ -277,6 +291,8 @@ def off_ball_run_component(
                    (events_df['dangerous'] == dangerous_filter))
     if phase is not None and 'team_in_possession_phase_type' in events_df.columns:
         league_mask = league_mask & (events_df['team_in_possession_phase_type'] == phase)
+    if 'event_subtype' in events_df.columns:
+        league_mask = league_mask & (events_df['event_subtype'].isin(event_subtypes))
     league_events = events_df[league_mask]
 
     all_team_ids = league_events['team_id'].unique()
@@ -1010,7 +1026,7 @@ def off_ball_run_component(
 
           const label = document.createElement('div');
           label.className = 'summary-label';
-          label.textContent = 'Season Summary' + (data.phase ? ' \\u2014 ' + data.phase.charAt(0).toUpperCase() + data.phase.slice(1) : '');
+          label.textContent = 'Dangerous Off-Ball Runs' + (data.phase ? ' \\u2014 ' + data.phase.charAt(0).toUpperCase() + data.phase.slice(1) + ' Phase' : '');
           group.appendChild(label);
 
           const desc = document.createElement('div');
