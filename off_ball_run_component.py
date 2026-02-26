@@ -347,6 +347,7 @@ def off_ball_run_component(
         "y_max": y_max,
         "bar_chart_width": bar_chart_width,
         "n_matches": len(match_data),
+        "phase": phase if phase else None,
     }
 
     # ================================================================
@@ -368,7 +369,7 @@ def off_ball_run_component(
           display: flex;
           flex-wrap: wrap;
           gap: 24px;
-          justify-content: flex-start;
+          justify-content: center;
         }}
         .match-group {{
           display: flex;
@@ -550,7 +551,7 @@ def off_ball_run_component(
         /* Summary */
         #summaryArea {{
           display: flex;
-          justify-content: flex-start;
+          justify-content: center;
         }}
         .summary-card {{
           padding: 0 0 6px 0;
@@ -639,7 +640,8 @@ def off_ball_run_component(
           }} : {{ r: 0, g: 102, b: 0 }};
         }}
 
-        function drawPitch(ctx) {{
+        function drawPitch(ctx, showVerticalZones) {{
+          if (showVerticalZones === undefined) showVerticalZones = true;
           const left = padLeft, top = padTop;
           const right = padLeft + PW, bottom = padTop + PH;
           const cx = padLeft + PW / 2, cy = padTop + PH / 2;
@@ -680,9 +682,11 @@ def off_ball_run_component(
           ctx.lineWidth = 0.5;
           const gridCellW = PW / data.grid_cols;
           const gridCellH = PH / data.grid_rows;
-          for (let gc = 1; gc < data.grid_cols; gc++) {{
-            const gx = left + gc * gridCellW;
-            ctx.beginPath(); ctx.moveTo(gx, top); ctx.lineTo(gx, bottom); ctx.stroke();
+          if (showVerticalZones) {{
+            for (let gc = 1; gc < data.grid_cols; gc++) {{
+              const gx = left + gc * gridCellW;
+              ctx.beginPath(); ctx.moveTo(gx, top); ctx.lineTo(gx, bottom); ctx.stroke();
+            }}
           }}
           for (let gr = 1; gr < data.grid_rows; gr++) {{
             const gy = top + gr * gridCellH;
@@ -959,7 +963,7 @@ def off_ball_run_component(
 
           const label = document.createElement('div');
           label.className = 'summary-label';
-          label.textContent = 'Season Summary';
+          label.textContent = 'Season Summary' + (data.phase ? ' \\u2014 ' + data.phase.charAt(0).toUpperCase() + data.phase.slice(1) : '');
           group.appendChild(label);
 
           const desc = document.createElement('div');
@@ -1034,7 +1038,7 @@ def off_ball_run_component(
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvasW, canvasH);
-          drawPitch(ctx);
+          drawPitch(ctx, false);
           drawHeatmapGrid(ctx, gridData, data.global_max);
           drawSelectionHighlight(ctx, matchStates[matchIdx].selectedCells, gridType);
         }}
@@ -1082,7 +1086,7 @@ def off_ball_run_component(
           ctx.imageSmoothingQuality = 'high';
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvasW, canvasH);
-          drawPitch(ctx);
+          drawPitch(ctx, false);
           drawHeatmapGrid(ctx, gridData, data.global_max);
 
           canvas.addEventListener('click', function(e) {{
