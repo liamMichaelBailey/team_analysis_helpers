@@ -98,14 +98,14 @@ def off_ball_run_component(
     # ----------------------------------------------------------------
     # Zone breakpoints  (professional analyst defaults)
     # x_breaks: 7 cols — own-box | build-up | own-mid | opp-mid |
-    #           final-third | outer-PB | inner-PB
+    #           final-third | PB-to-6yd | 6-yard-box
     # y_breaks: 5 rows — wide-L | left-HS | central | right-HS | wide-R
     # ----------------------------------------------------------------
     if x_breaks is None:
         if grid_cols is not None:
             x_breaks = np.linspace(x_min, x_max, grid_cols + 1).tolist()
         else:
-            x_breaks = [-52.5, -36, -17.5, 0, 17.5, 36, 44.25, 52.5]
+            x_breaks = [-52.5, -36, -17.5, 0, 17.5, 36, 47, 52.5]
     if y_breaks is None:
         if grid_rows is not None:
             y_breaks = np.linspace(y_min, y_max, grid_rows + 1).tolist()
@@ -690,8 +690,8 @@ def off_ball_run_component(
 
           ctx.fillStyle = '#f0f7f0';
           ctx.fillRect(left, top, PW, PH);
-          ctx.strokeStyle = '#8a9a8a';
-          ctx.lineWidth = 0.75;
+          ctx.strokeStyle = '#6a7a6a';
+          ctx.lineWidth = 1;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
           ctx.strokeRect(left, top, PW, PH);
@@ -700,7 +700,7 @@ def off_ball_run_component(
 
           const centerR = (9.15 / 68) * PH;
           ctx.beginPath(); ctx.arc(cx, cy, centerR, 0, 2 * Math.PI); ctx.stroke();
-          ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI); ctx.fillStyle = '#8a9a8a'; ctx.fill();
+          ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI); ctx.fillStyle = '#6a7a6a'; ctx.fill();
 
           const paW = (16.5 / 105) * PW, paH = (40.32 / 68) * PH, paTop = cy - paH / 2;
           ctx.strokeRect(left, paTop, paW, paH);
@@ -711,13 +711,15 @@ def off_ball_run_component(
           ctx.strokeRect(right - gaW, gaTop, gaW, gaH);
 
           const penSpotDist = (11 / 105) * PW;
-          ctx.fillStyle = '#8a9a8a';
+          ctx.fillStyle = '#6a7a6a';
           ctx.beginPath(); ctx.arc(left + penSpotDist, cy, 1.5, 0, 2 * Math.PI); ctx.fill();
           ctx.beginPath(); ctx.arc(right - penSpotDist, cy, 1.5, 0, 2 * Math.PI); ctx.fill();
 
           const penArcR = (9.15 / 68) * PH;
-          ctx.beginPath(); ctx.arc(left + penSpotDist, cy, penArcR, -0.6, 0.6); ctx.stroke();
-          ctx.beginPath(); ctx.arc(right - penSpotDist, cy, penArcR, Math.PI - 0.6, Math.PI + 0.6); ctx.stroke();
+          const dxPx = paW - penSpotDist;
+          const dAngle = Math.acos(Math.min(1, dxPx / penArcR));
+          ctx.beginPath(); ctx.arc(left + penSpotDist, cy, penArcR, -dAngle, dAngle); ctx.stroke();
+          ctx.beginPath(); ctx.arc(right - penSpotDist, cy, penArcR, Math.PI - dAngle, Math.PI + dAngle); ctx.stroke();
 
           // Zone grid lines (non-uniform breakpoints)
           ctx.strokeStyle = '#d0dbd0';
