@@ -281,25 +281,36 @@ def off_ball_run_component(
 
     n_teams = len(all_team_ids)
 
-    zscore_bounds = [-0.5, 0.5, 1.5]  # boundaries between the 5 bands
-
     def compute_color_grid(grid_type):
-        """Z-score each cell vs the league → 5-band color index."""
+        """Z-score each cell vs ALL zones across the league → 5-band color index."""
         color = np.full((grid_rows, grid_cols), -1, dtype=int)
         if n_teams == 0:
             return color.tolist()
+
+        # Collect every zone value across all teams into one flat array
+        all_zone_vals = []
+        for tid in all_team_ids:
+            grid = league_pm[tid][grid_type]
+            for r in range(grid_rows):
+                for c in range(grid_cols):
+                    all_zone_vals.append(grid[r][c])
+        all_zone_vals = np.array(all_zone_vals)
+
+        # Global mean & std across ALL zones and ALL teams
+        global_mean = all_zone_vals.mean()
+        global_std = all_zone_vals.std()
+
+        team_grid = league_pm.get(team_id, {}).get(
+            grid_type, np.zeros((grid_rows, grid_cols))
+        )
+
         for r in range(grid_rows):
             for c in range(grid_cols):
-                vals = np.array([league_pm[tid][grid_type][r][c] for tid in all_team_ids])
-                team_val = league_pm.get(team_id, {}).get(grid_type, np.zeros((grid_rows, grid_cols)))[r][c]
-                if vals.max() == 0:
-                    continue  # no team has runs here
-                mean = vals.mean()
-                std = vals.std()
-                if std == 0:
+                team_val = team_grid[r][c]
+                if global_std == 0:
                     z = 0.0
                 else:
-                    z = (team_val - mean) / std
+                    z = (team_val - global_mean) / global_std
                 # Bin: <-1.5 → 0, <-0.5 → 1, <0.5 → 2, <1.5 → 3, >=1.5 → 4
                 if z < -1.5:
                     color[r][c] = 0
@@ -974,7 +985,7 @@ def off_ball_run_component(
 
           const desc = document.createElement('div');
           desc.className = 'summary-desc';
-          desc.textContent = 'Per-match values \\u00B7 Colored by league z-score';
+          desc.textContent = 'Per-match values \\u00B7 Colored by z-score across all zones';
           group.appendChild(desc);
 
           const row = document.createElement('div');
@@ -1028,7 +1039,7 @@ def off_ball_run_component(
 
           const legendSub = document.createElement('div');
           legendSub.className = 'legend-subtitle';
-          legendSub.textContent = 'Compared to league average (z-score)';
+          legendSub.textContent = 'Z-score vs all league zones';
           group.appendChild(legendSub);
 
           summaryArea.appendChild(group);
