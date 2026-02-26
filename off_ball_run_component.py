@@ -346,6 +346,7 @@ def off_ball_run_component(
         "y_min": y_min,
         "y_max": y_max,
         "bar_chart_width": bar_chart_width,
+        "n_matches": len(match_data),
     }
 
     # ================================================================
@@ -387,11 +388,13 @@ def off_ball_run_component(
           font-size: 14px;
         }}
         .summary-label {{
-          font-size: 14px;
+          font-size: 15px;
           font-weight: 800;
           color: {text_color};
-          margin-bottom: 6px;
+          margin-bottom: 2px;
           text-align: center;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }}
         .pitches-row {{
           display: flex;
@@ -405,16 +408,19 @@ def off_ball_run_component(
           position: relative;
         }}
         .pitch-subtitle {{
-          font-size: 10px;
-          font-weight: 600;
+          font-size: 11px;
+          font-weight: 700;
           color: {text_color};
           margin-bottom: 3px;
           text-align: center;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }}
         .pitch-total {{
-          font-size: 9px;
+          font-size: 10px;
           color: #888;
           margin-top: 2px;
+          font-weight: 500;
         }}
         .pitch-download {{
           width: 18px;
@@ -477,9 +483,9 @@ def off_ball_run_component(
           padding: 1.5px 0;
         }}
         .bar-name {{
-          font-size: 9px;
+          font-size: 10px;
           color: {text_color};
-          width: 65px;
+          width: 80px;
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
@@ -500,18 +506,18 @@ def off_ball_run_component(
           transition: width 0.2s;
         }}
         .bar-count {{
-          font-size: 9px;
+          font-size: 10px;
           color: #888;
-          width: 18px;
+          width: 22px;
           text-align: right;
           flex-shrink: 0;
         }}
         .bar-chart-footer {{
-          font-size: 9px;
+          font-size: 10px;
           color: #888;
-          margin-top: 2px;
+          margin-top: 4px;
           text-align: center;
-          min-height: 13px;
+          min-height: 15px;
         }}
         .bar-chart-clear {{
           color: {primary_color};
@@ -525,9 +531,9 @@ def off_ball_run_component(
         .legend-row {{
           display: flex;
           justify-content: center;
-          gap: 12px;
-          margin-top: 6px;
-          font-size: 9px;
+          gap: 14px;
+          margin-top: 10px;
+          font-size: 10px;
           color: {text_color};
         }}
         .legend-item {{
@@ -539,6 +545,27 @@ def off_ball_run_component(
           width: 14px;
           height: 10px;
           border-radius: 2px;
+        }}
+
+        /* Summary card */
+        .summary-card {{
+          background: #fafbfc;
+          border: 1px solid #e4e8ec;
+          border-radius: 8px;
+          padding: 14px 18px 10px 18px;
+        }}
+        .summary-desc {{
+          font-size: 10px;
+          color: #999;
+          text-align: center;
+          margin-bottom: 8px;
+          font-weight: 400;
+        }}
+        .legend-subtitle {{
+          font-size: 9px;
+          color: #999;
+          text-align: center;
+          margin-top: 2px;
         }}
 
         /* Divider */
@@ -646,6 +673,27 @@ def off_ball_run_component(
           const penArcR = (9.15 / 68) * PH;
           ctx.beginPath(); ctx.arc(left + penSpotDist, cy, penArcR, -0.6, 0.6); ctx.stroke();
           ctx.beginPath(); ctx.arc(right - penSpotDist, cy, penArcR, Math.PI - 0.6, Math.PI + 0.6); ctx.stroke();
+
+          // Zone grid lines
+          ctx.strokeStyle = '#d0dbd0';
+          ctx.lineWidth = 0.5;
+          const gridCellW = PW / data.grid_cols;
+          const gridCellH = PH / data.grid_rows;
+          for (let gc = 1; gc < data.grid_cols; gc++) {{
+            const gx = left + gc * gridCellW;
+            ctx.beginPath(); ctx.moveTo(gx, top); ctx.lineTo(gx, bottom); ctx.stroke();
+          }}
+          for (let gr = 1; gr < data.grid_rows; gr++) {{
+            const gy = top + gr * gridCellH;
+            ctx.beginPath(); ctx.moveTo(left, gy); ctx.lineTo(right, gy); ctx.stroke();
+          }}
+
+          // Attack direction indicator
+          ctx.font = '600 7px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.fillStyle = '#aaaaaa';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('ATT \\u2192', right, top - 1);
         }}
 
         function drawSelectionHighlight(ctx, selectedCells, gridType) {{
@@ -684,7 +732,7 @@ def off_ball_run_component(
               const y = padTop + (data.grid_rows - 1 - r) * cellH;
               ctx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
               ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cellW - 2, cellH - 2, 2); ctx.fill();
-              ctx.font = 'bold 9px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+              ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
               ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
               ctx.fillStyle = intensity > 0.5 ? '#ffffff' : data.text_color;
               ctx.fillText(count, x + cellW / 2, y + cellH / 2);
@@ -710,7 +758,7 @@ def off_ball_run_component(
                 ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cellW - 2, cellH - 2, 2); ctx.fill();
               }}
               if (val > 0) {{
-                ctx.font = 'bold 8px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                ctx.font = 'bold 9px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillStyle = (colorIdx === 0 || colorIdx === 4) ? '#ffffff' : data.text_color;
                 const txt = val >= 10 ? Math.round(val).toString() : val.toFixed(1);
@@ -729,7 +777,7 @@ def off_ball_run_component(
               grandTotal += rawGrid[r][c];
           if (grandTotal === 0) return;
 
-          ctx.font = '600 7px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.font = '600 8px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
           ctx.fillStyle = '#888888';
 
           // Row totals (right of pitch)
@@ -878,7 +926,7 @@ def off_ball_run_component(
 
           const totalEl = document.createElement('div');
           totalEl.className = 'pitch-total';
-          totalEl.textContent = total + ' runs';
+          totalEl.textContent = total + ' runs \\u00B7 ' + data.n_matches + ' matches';
           wrapper.appendChild(totalEl);
 
           return wrapper;
@@ -887,7 +935,7 @@ def off_ball_run_component(
         function renderSummary() {{
           const s = data.summary;
           const group = document.createElement('div');
-          group.className = 'match-group';
+          group.className = 'match-group summary-card';
 
           const dlBtn = document.createElement('button');
           dlBtn.className = 'pitch-download';
@@ -896,7 +944,7 @@ def off_ball_run_component(
           dlBtn.onclick = function(e) {{
             e.stopPropagation();
             dlBtn.style.visibility = 'hidden';
-            html2canvas(group, {{ scale: 4, useCORS: true, backgroundColor: '#ffffff' }}).then(function(c) {{
+            html2canvas(group, {{ scale: 4, useCORS: true, backgroundColor: '#fafbfc' }}).then(function(c) {{
               const link = document.createElement('a');
               link.href = c.toDataURL('image/png');
               link.download = 'runs_season_summary.png';
@@ -910,6 +958,11 @@ def off_ball_run_component(
           label.className = 'summary-label';
           label.textContent = 'Season Summary';
           group.appendChild(label);
+
+          const desc = document.createElement('div');
+          desc.className = 'summary-desc';
+          desc.textContent = 'Per-match values \\u00B7 Colored by league percentile';
+          group.appendChild(desc);
 
           const row = document.createElement('div');
           row.className = 'pitches-row';
@@ -932,11 +985,11 @@ def off_ball_run_component(
           bcWrapper.style.width = BCW + 'px';
           const bcTitle = document.createElement('div');
           bcTitle.className = 'pitch-subtitle';
-          bcTitle.textContent = 'Players';
+          bcTitle.textContent = 'Player Runs';
           bcWrapper.appendChild(bcTitle);
           const bcScroll = document.createElement('div');
           bcScroll.className = 'bar-chart-scroll';
-          bcScroll.style.height = canvasH + 'px';
+          bcScroll.style.height = sumCanvasH + 'px';
           bcWrapper.appendChild(bcScroll);
           const bcFooter = document.createElement('div');
           bcFooter.className = 'bar-chart-footer';
@@ -959,6 +1012,11 @@ def off_ball_run_component(
             legend.appendChild(item);
           }});
           group.appendChild(legend);
+
+          const legendSub = document.createElement('div');
+          legendSub.className = 'legend-subtitle';
+          legendSub.textContent = 'League percentile ranking';
+          group.appendChild(legendSub);
 
           summaryArea.appendChild(group);
           document.getElementById('summaryDivider').style.display = '';
@@ -1099,7 +1157,7 @@ def off_ball_run_component(
           bcWrapper.style.width = BCW + 'px';
           const bcTitle = document.createElement('div');
           bcTitle.className = 'pitch-subtitle';
-          bcTitle.textContent = 'Players';
+          bcTitle.textContent = 'Player Runs';
           bcWrapper.appendChild(bcTitle);
           const bcScroll = document.createElement('div');
           bcScroll.className = 'bar-chart-scroll';
