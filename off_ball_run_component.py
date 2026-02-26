@@ -24,8 +24,10 @@ def off_ball_run_component(
         match_date_col: str = "match_date",
         event_type_filter: str = "off_ball_run",
         dangerous_filter: bool = True,
-        grid_cols: int = 6,
-        grid_rows: int = 5,
+        grid_cols: int = None,
+        grid_rows: int = None,
+        x_breaks: list = None,
+        y_breaks: list = None,
         primary_color: str = "#006600",
         text_color: str = "#333333",
         highlight_entity: str = None,
@@ -94,6 +96,27 @@ def off_ball_run_component(
     y_min, y_max = -pitch_width / 2, pitch_width / 2
 
     # ----------------------------------------------------------------
+    # Zone breakpoints  (professional analyst defaults)
+    # x_breaks: 7 cols — own-box | build-up | own-mid | opp-mid |
+    #           final-third | outer-PB | inner-PB
+    # y_breaks: 5 rows — wide-L | left-HS | central | right-HS | wide-R
+    # ----------------------------------------------------------------
+    if x_breaks is None:
+        if grid_cols is not None:
+            x_breaks = np.linspace(x_min, x_max, grid_cols + 1).tolist()
+        else:
+            x_breaks = [-52.5, -36, -17.5, 0, 17.5, 36, 44.25, 52.5]
+    if y_breaks is None:
+        if grid_rows is not None:
+            y_breaks = np.linspace(y_min, y_max, grid_rows + 1).tolist()
+        else:
+            y_breaks = [-34, -20.16, -9.16, 9.16, 20.16, 34]
+    grid_cols = len(x_breaks) - 1
+    grid_rows = len(y_breaks) - 1
+    x_breaks_arr = np.array(x_breaks)
+    y_breaks_arr = np.array(y_breaks)
+
+    # ----------------------------------------------------------------
     # Filter events for the target team
     # ----------------------------------------------------------------
     mask = ((events_df['event_type'] == event_type_filter) &
@@ -129,14 +152,10 @@ def off_ball_run_component(
         grid = np.zeros((grid_rows, grid_cols), dtype=int)
         cell_players = {}
         for _, row in df_subset.iterrows():
-            x_val = row['x_end']
-            y_val = row['y_end']
-            x_val = max(x_min, min(x_max - 0.001, x_val))
-            y_val = max(y_min, min(y_max - 0.001, y_val))
-            col_idx = int((x_val - x_min) / (x_max - x_min) * grid_cols)
-            row_idx = int((y_val - y_min) / (y_max - y_min) * grid_rows)
-            col_idx = min(col_idx, grid_cols - 1)
-            row_idx = min(row_idx, grid_rows - 1)
+            x_val = float(row['x_end'])
+            y_val = float(row['y_end'])
+            col_idx = int(np.clip(np.searchsorted(x_breaks_arr, x_val, side='right') - 1, 0, grid_cols - 1))
+            row_idx = int(np.clip(np.searchsorted(y_breaks_arr, y_val, side='right') - 1, 0, grid_rows - 1))
             grid[row_idx][col_idx] += 1
             if has_player_col:
                 key = f"{row_idx}_{col_idx}"
@@ -151,10 +170,10 @@ def off_ball_run_component(
         grid = np.zeros((grid_rows, grid_cols), dtype=float)
         if len(df_subset) == 0 or n_matches == 0:
             return grid
-        x_vals = np.clip(df_subset['x_end'].values.astype(float), x_min, x_max - 0.001)
-        y_vals = np.clip(df_subset['y_end'].values.astype(float), y_min, y_max - 0.001)
-        c_idx = np.clip(((x_vals - x_min) / (x_max - x_min) * grid_cols).astype(int), 0, grid_cols - 1)
-        r_idx = np.clip(((y_vals - y_min) / (y_max - y_min) * grid_rows).astype(int), 0, grid_rows - 1)
+        x_vals = df_subset['x_end'].values.astype(float)
+        y_vals = df_subset['y_end'].values.astype(float)
+        c_idx = np.clip(np.searchsorted(x_breaks_arr, x_vals, side='right') - 1, 0, grid_cols - 1)
+        r_idx = np.clip(np.searchsorted(y_breaks_arr, y_vals, side='right') - 1, 0, grid_rows - 1)
         np.add.at(grid, (r_idx, c_idx), 1)
         grid = grid / n_matches
         return grid
@@ -282,36 +301,24 @@ def off_ball_run_component(
     n_teams = len(all_team_ids)
 
     def compute_color_grid(grid_type):
-        """Z-score each cell vs ALL zones across the league → 5-band color index."""
+        """Z-score each cell vs the same zone across the league → 5-band color index."""
         color = np.full((grid_rows, grid_cols), -1, dtype=int)
         if n_teams == 0:
             return color.tolist()
-
-        # Collect every zone value across all teams into one flat array
-        all_zone_vals = []
-        for tid in all_team_ids:
-            grid = league_pm[tid][grid_type]
-            for r in range(grid_rows):
-                for c in range(grid_cols):
-                    all_zone_vals.append(grid[r][c])
-        all_zone_vals = np.array(all_zone_vals)
-
-        # Global mean & std across ALL zones and ALL teams
-        global_mean = all_zone_vals.mean()
-        global_std = all_zone_vals.std()
-
-        team_grid = league_pm.get(team_id, {}).get(
-            grid_type, np.zeros((grid_rows, grid_cols))
-        )
-
         for r in range(grid_rows):
             for c in range(grid_cols):
-                team_val = team_grid[r][c]
-                if global_std == 0:
+                vals = np.array([league_pm[tid][grid_type][r][c] for tid in all_team_ids])
+                team_val = league_pm.get(team_id, {}).get(grid_type, np.zeros((grid_rows, grid_cols)))[r][c]
+                if team_val == 0:
+                    continue  # no data for this team in this zone → leave empty
+                if vals.max() == 0:
+                    continue
+                mean = vals.mean()
+                std = vals.std()
+                if std == 0:
                     z = 0.0
                 else:
-                    z = (team_val - global_mean) / global_std
-                # Bin: <-1.5 → 0, <-0.5 → 1, <0.5 → 2, <1.5 → 3, >=1.5 → 4
+                    z = (team_val - mean) / std
                 if z < -1.5:
                     color[r][c] = 0
                 elif z < -0.5:
@@ -351,6 +358,8 @@ def off_ball_run_component(
         "matches": match_data,
         "grid_cols": grid_cols,
         "grid_rows": grid_rows,
+        "x_breaks": x_breaks if isinstance(x_breaks, list) else x_breaks_arr.tolist(),
+        "y_breaks": y_breaks if isinstance(y_breaks, list) else y_breaks_arr.tolist(),
         "global_max": global_max,
         "primary_color": primary_color,
         "text_color": text_color,
@@ -635,6 +644,22 @@ def off_ball_run_component(
         const LEAGUE_COLORS = ['#FF1A1A', '#FDA4A4', '#D9D9D6', '#99E59A', '#00C800'];
         const LEAGUE_LABELS = ['Very Low', 'Low', 'Average', 'High', 'Very High'];
 
+        // Precompute pixel positions from zone breakpoints
+        const xBreaks = data.x_breaks;
+        const yBreaks = data.y_breaks;
+        const colLeft = [];
+        const colW = [];
+        for (let c = 0; c < data.grid_cols; c++) {{
+          colLeft[c] = padLeft + (xBreaks[c] - xMin) / (xMax - xMin) * PW;
+          colW[c] = (xBreaks[c + 1] - xBreaks[c]) / (xMax - xMin) * PW;
+        }}
+        const rowTop = [];
+        const rowH = [];
+        for (let r = 0; r < data.grid_rows; r++) {{
+          rowTop[r] = padTop + (yMax - yBreaks[r + 1]) / (yMax - yMin) * PH;
+          rowH[r] = (yBreaks[r + 1] - yBreaks[r]) / (yMax - yMin) * PH;
+        }}
+
         // Per-match interaction state
         const matchStates = [];
         // Summary interaction state
@@ -694,19 +719,17 @@ def off_ball_run_component(
           ctx.beginPath(); ctx.arc(left + penSpotDist, cy, penArcR, -0.6, 0.6); ctx.stroke();
           ctx.beginPath(); ctx.arc(right - penSpotDist, cy, penArcR, Math.PI - 0.6, Math.PI + 0.6); ctx.stroke();
 
-          // Zone grid lines
+          // Zone grid lines (non-uniform breakpoints)
           ctx.strokeStyle = '#d0dbd0';
           ctx.lineWidth = 0.5;
-          const gridCellW = PW / data.grid_cols;
-          const gridCellH = PH / data.grid_rows;
           if (showVerticalZones) {{
-            for (let gc = 1; gc < data.grid_cols; gc++) {{
-              const gx = left + gc * gridCellW;
+            for (let i = 1; i < xBreaks.length - 1; i++) {{
+              const gx = padLeft + (xBreaks[i] - xMin) / (xMax - xMin) * PW;
               ctx.beginPath(); ctx.moveTo(gx, top); ctx.lineTo(gx, bottom); ctx.stroke();
             }}
           }}
-          for (let gr = 1; gr < data.grid_rows; gr++) {{
-            const gy = top + gr * gridCellH;
+          for (let i = 1; i < yBreaks.length - 1; i++) {{
+            const gy = padTop + (yMax - yBreaks[i]) / (yMax - yMin) * PH;
             ctx.beginPath(); ctx.moveTo(left, gy); ctx.lineTo(right, gy); ctx.stroke();
           }}
 
@@ -719,20 +742,20 @@ def off_ball_run_component(
         }}
 
         function drawSelectionHighlight(ctx, selectedCells, gridType) {{
-          const cellW = PW / data.grid_cols;
-          const cellH = PH / data.grid_rows;
           selectedCells.forEach(function(cellKey) {{
             const parts = cellKey.split('_');
             if (parts[0] !== gridType) return;
             const r = parseInt(parts[1]), c = parseInt(parts[2]);
-            const x = padLeft + c * cellW;
-            const y = padTop + (data.grid_rows - 1 - r) * cellH;
+            const x = colLeft[c];
+            const y = rowTop[r];
+            const cw = colW[c];
+            const ch = rowH[r];
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2.5;
-            ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4);
+            ctx.strokeRect(x + 2, y + 2, cw - 4, ch - 4);
             ctx.strokeStyle = data.text_color;
             ctx.lineWidth = 1;
-            ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4);
+            ctx.strokeRect(x + 2, y + 2, cw - 4, ch - 4);
           }});
         }}
 
@@ -741,8 +764,6 @@ def off_ball_run_component(
            ========================================================== */
         function drawHeatmapGrid(ctx, gridData, globalMax) {{
           if (globalMax === 0) return;
-          const cellW = PW / data.grid_cols;
-          const cellH = PH / data.grid_rows;
           const rgb = hexToRgb(data.primary_color);
           for (let r = 0; r < data.grid_rows; r++) {{
             for (let c = 0; c < data.grid_cols; c++) {{
@@ -750,14 +771,16 @@ def off_ball_run_component(
               if (count === 0) continue;
               const intensity = count / globalMax;
               const alpha = 0.15 + intensity * 0.5;
-              const x = padLeft + c * cellW;
-              const y = padTop + (data.grid_rows - 1 - r) * cellH;
+              const x = colLeft[c];
+              const y = rowTop[r];
+              const cw = colW[c];
+              const ch = rowH[r];
               ctx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
-              ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cellW - 2, cellH - 2, 2); ctx.fill();
+              ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cw - 2, ch - 2, 2); ctx.fill();
               ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
               ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
               ctx.fillStyle = intensity > 0.5 ? '#ffffff' : data.text_color;
-              ctx.fillText(count, x + cellW / 2, y + cellH / 2);
+              ctx.fillText(count, x + cw / 2, y + ch / 2);
             }}
           }}
         }}
@@ -766,19 +789,20 @@ def off_ball_run_component(
            Summary heatmap (discrete league colors, % text)
            ========================================================== */
         function drawSummaryHeatmapGrid(ctx, valData, colorData) {{
-          const cellW = PW / data.grid_cols;
-          const cellH = PH / data.grid_rows;
           for (let r = 0; r < data.grid_rows; r++) {{
             for (let c = 0; c < data.grid_cols; c++) {{
               const val = valData[r][c];
               const colorIdx = colorData[r][c];
-              const x = padLeft + c * cellW;
-              const y = padTop + (data.grid_rows - 1 - r) * cellH;
+              if (val === 0 && colorIdx < 0) continue;  // empty zone — no fill
+              const x = colLeft[c];
+              const y = rowTop[r];
+              const cw = colW[c];
+              const ch = rowH[r];
 
               if (colorIdx >= 0) {{
                 ctx.globalAlpha = 0.65;
                 ctx.fillStyle = LEAGUE_COLORS[colorIdx];
-                ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cellW - 2, cellH - 2, 2); ctx.fill();
+                ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cw - 2, ch - 2, 2); ctx.fill();
                 ctx.globalAlpha = 1.0;
               }}
               if (val > 0) {{
@@ -786,15 +810,13 @@ def off_ball_run_component(
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillStyle = (colorIdx === 0 || colorIdx === 4) ? '#ffffff' : data.text_color;
                 const txt = val >= 10 ? Math.round(val).toString() : val.toFixed(1);
-                ctx.fillText(txt, x + cellW / 2, y + cellH / 2);
+                ctx.fillText(txt, x + cw / 2, y + ch / 2);
               }}
             }}
           }}
         }}
 
         function drawMarginals(ctx, rawGrid) {{
-          const cellW = PW / data.grid_cols;
-          const cellH = PH / data.grid_rows;
           let grandTotal = 0;
           for (let r = 0; r < data.grid_rows; r++)
             for (let c = 0; c < data.grid_cols; c++)
@@ -809,7 +831,7 @@ def off_ball_run_component(
             let rowSum = 0;
             for (let c = 0; c < data.grid_cols; c++) rowSum += rawGrid[r][c];
             const pct = Math.round(rowSum / grandTotal * 100);
-            const y = padTop + (data.grid_rows - 1 - r) * cellH + cellH / 2;
+            const y = rowTop[r] + rowH[r] / 2;
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             ctx.fillText(pct + '%', padLeft + PW + 3, y);
           }}
@@ -819,7 +841,7 @@ def off_ball_run_component(
             let colSum = 0;
             for (let r = 0; r < data.grid_rows; r++) colSum += rawGrid[r][c];
             const pct = Math.round(colSum / grandTotal * 100);
-            const x = padLeft + c * cellW + cellW / 2;
+            const x = colLeft[c] + colW[c] / 2;
             ctx.textAlign = 'center'; ctx.textBaseline = 'top';
             ctx.fillText(pct + '%', x, padTop + PH + 2);
           }}
@@ -934,13 +956,19 @@ def off_ball_run_component(
 
           canvas.addEventListener('click', function(e) {{
             const rect = canvas.getBoundingClientRect();
-            const px = e.clientX - rect.left - padLeft;
-            const py = e.clientY - rect.top - padTop;
-            if (px < 0 || px >= PW || py < 0 || py >= PH) return;
-            const cellW = PW / data.grid_cols, cellH = PH / data.grid_rows;
-            const col = Math.min(Math.floor(px / cellW), data.grid_cols - 1);
-            const vr = Math.min(Math.floor(py / cellH), data.grid_rows - 1);
-            const gr = data.grid_rows - 1 - vr;
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+            // Find column from pixel x
+            let col = -1;
+            for (let c = 0; c < data.grid_cols; c++) {{
+              if (px >= colLeft[c] && px < colLeft[c] + colW[c]) {{ col = c; break; }}
+            }}
+            // Find row from pixel y
+            let gr = -1;
+            for (let r = 0; r < data.grid_rows; r++) {{
+              if (py >= rowTop[r] && py < rowTop[r] + rowH[r]) {{ gr = r; break; }}
+            }}
+            if (col < 0 || gr < 0) return;
             const key = gridType + '_' + gr + '_' + col;
             if (summaryState.selectedCells.has(key)) {{ summaryState.selectedCells.delete(key); }}
             else {{ summaryState.selectedCells.add(key); }}
@@ -985,7 +1013,7 @@ def off_ball_run_component(
 
           const desc = document.createElement('div');
           desc.className = 'summary-desc';
-          desc.textContent = 'Per-match values \\u00B7 Colored by z-score across all zones';
+          desc.textContent = 'Per-match values \\u00B7 Colored by zone z-score vs league';
           group.appendChild(desc);
 
           const row = document.createElement('div');
@@ -1039,7 +1067,7 @@ def off_ball_run_component(
 
           const legendSub = document.createElement('div');
           legendSub.className = 'legend-subtitle';
-          legendSub.textContent = 'Z-score vs all league zones';
+          legendSub.textContent = 'Z-score vs league (per zone)';
           group.appendChild(legendSub);
 
           summaryArea.appendChild(group);
@@ -1108,13 +1136,17 @@ def off_ball_run_component(
 
           canvas.addEventListener('click', function(e) {{
             const rect = canvas.getBoundingClientRect();
-            const px = e.clientX - rect.left - padLeft;
-            const py = e.clientY - rect.top - padTop;
-            if (px < 0 || px >= PW || py < 0 || py >= PH) return;
-            const cellW = PW / data.grid_cols, cellH = PH / data.grid_rows;
-            const col = Math.min(Math.floor(px / cellW), data.grid_cols - 1);
-            const vr = Math.min(Math.floor(py / cellH), data.grid_rows - 1);
-            const gr = data.grid_rows - 1 - vr;
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+            let col = -1;
+            for (let c = 0; c < data.grid_cols; c++) {{
+              if (px >= colLeft[c] && px < colLeft[c] + colW[c]) {{ col = c; break; }}
+            }}
+            let gr = -1;
+            for (let r = 0; r < data.grid_rows; r++) {{
+              if (py >= rowTop[r] && py < rowTop[r] + rowH[r]) {{ gr = r; break; }}
+            }}
+            if (col < 0 || gr < 0) return;
             const key = gridType + '_' + gr + '_' + col;
             const state = matchStates[matchIdx];
             if (state.selectedCells.has(key)) {{ state.selectedCells.delete(key); }}
