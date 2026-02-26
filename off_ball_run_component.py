@@ -141,14 +141,14 @@ def off_ball_run_component(
         grid_all = bin_events(match_events)
 
         # Targeted runs
-        if 'is_targeted_run' in match_events.columns:
+        if 'targeted' in match_events.columns:
             targeted = match_events[match_events['targeted'] == True]
         else:
             targeted = pd.DataFrame()
         grid_targeted = bin_events(targeted)
 
         # Received runs
-        if 'is_received_run' in match_events.columns:
+        if 'received' in match_events.columns:
             received = match_events[match_events['received'] == True]
         else:
             received = pd.DataFrame()
