@@ -22,7 +22,8 @@ def off_ball_run_component(
         match_col: str = "match_id",
         match_label_col: str = None,
         match_date_col: str = "match_date",
-        event_type_filter: str = "dangerous_off_ball_run",
+        event_type_filter: str = "off_ball_run",
+        dangerous_filter: bool = True,
         grid_cols: int = 6,
         grid_rows: int = 5,
         primary_color: str = "#006600",
@@ -79,7 +80,10 @@ def off_ball_run_component(
     y_min, y_max = -pitch_width / 2, pitch_width / 2
 
     # Filter events
-    mask = (events_df['event_type'] == event_type_filter) & (events_df['team_id'] == team_id)
+    mask = ((events_df['event_type'] == event_type_filter) &
+            (events_df['dangerous'] == dangerous_filter) &
+            (events_df['team_id'] == team_id))
+
     if phase is not None and 'team_in_possession_phase_type' in events_df.columns:
         mask = mask & (events_df['team_in_possession_phase_type'] == phase)
     filtered = events_df[mask].copy()
@@ -138,14 +142,14 @@ def off_ball_run_component(
 
         # Targeted runs
         if 'is_targeted_run' in match_events.columns:
-            targeted = match_events[match_events['is_targeted_run'] == True]
+            targeted = match_events[match_events['targeted'] == True]
         else:
             targeted = pd.DataFrame()
         grid_targeted = bin_events(targeted)
 
         # Received runs
         if 'is_received_run' in match_events.columns:
-            received = match_events[match_events['is_received_run'] == True]
+            received = match_events[match_events['received'] == True]
         else:
             received = pd.DataFrame()
         grid_received = bin_events(received)
