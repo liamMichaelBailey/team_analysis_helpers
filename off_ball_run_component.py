@@ -129,8 +129,8 @@ def off_ball_run_component(
         grid = np.zeros((grid_rows, grid_cols), dtype=int)
         cell_players = {}
         for _, row in df_subset.iterrows():
-            x_val = row['x_start']
-            y_val = row['y_start']
+            x_val = row['x_end']
+            y_val = row['y_end']
             x_val = max(x_min, min(x_max - 0.001, x_val))
             y_val = max(y_min, min(y_max - 0.001, y_val))
             col_idx = int((x_val - x_min) / (x_max - x_min) * grid_cols)
@@ -151,8 +151,8 @@ def off_ball_run_component(
         grid = np.zeros((grid_rows, grid_cols), dtype=float)
         if len(df_subset) == 0 or n_matches == 0:
             return grid
-        x_vals = np.clip(df_subset['x_start'].values.astype(float), x_min, x_max - 0.001)
-        y_vals = np.clip(df_subset['y_start'].values.astype(float), y_min, y_max - 0.001)
+        x_vals = np.clip(df_subset['x_end'].values.astype(float), x_min, x_max - 0.001)
+        y_vals = np.clip(df_subset['y_end'].values.astype(float), y_min, y_max - 0.001)
         c_idx = np.clip(((x_vals - x_min) / (x_max - x_min) * grid_cols).astype(int), 0, grid_cols - 1)
         r_idx = np.clip(((y_vals - y_min) / (y_max - y_min) * grid_rows).astype(int), 0, grid_rows - 1)
         np.add.at(grid, (r_idx, c_idx), 1)
