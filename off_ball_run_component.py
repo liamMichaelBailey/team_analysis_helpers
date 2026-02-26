@@ -319,6 +319,9 @@ def off_ball_run_component(
             "val_all": summary_val_all,
             "val_targeted": summary_val_targeted,
             "val_received": summary_val_received,
+            "raw_all": summary_grid_all.tolist(),
+            "raw_targeted": summary_grid_targeted.tolist(),
+            "raw_received": summary_grid_received.tolist(),
             "color_all": summary_color_all,
             "color_targeted": summary_color_targeted,
             "color_received": summary_color_received,
@@ -577,6 +580,12 @@ def off_ball_run_component(
         const canvasW = PW + padLeft + padRight;
         const canvasH = PH + padTop + padBottom;
 
+        // Summary canvases need extra space for marginal % labels
+        const sumPadRight = 32;
+        const sumPadBottom = 16;
+        const sumCanvasW = PW + padLeft + sumPadRight;
+        const sumCanvasH = PH + padTop + sumPadBottom;
+
         const LEAGUE_COLORS = ['#FF1A1A', '#FDA4A4', '#D9D9D6', '#99E59A', '#00C800'];
         const LEAGUE_LABELS = ['Very Low', 'Low', 'Average', 'High', 'Very High'];
 
@@ -711,6 +720,39 @@ def off_ball_run_component(
           }}
         }}
 
+        function drawMarginals(ctx, rawGrid) {{
+          const cellW = PW / data.grid_cols;
+          const cellH = PH / data.grid_rows;
+          let grandTotal = 0;
+          for (let r = 0; r < data.grid_rows; r++)
+            for (let c = 0; c < data.grid_cols; c++)
+              grandTotal += rawGrid[r][c];
+          if (grandTotal === 0) return;
+
+          ctx.font = '600 7px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.fillStyle = '#888888';
+
+          // Row totals (right of pitch)
+          for (let r = 0; r < data.grid_rows; r++) {{
+            let rowSum = 0;
+            for (let c = 0; c < data.grid_cols; c++) rowSum += rawGrid[r][c];
+            const pct = Math.round(rowSum / grandTotal * 100);
+            const y = padTop + (data.grid_rows - 1 - r) * cellH + cellH / 2;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillText(pct + '%', padLeft + PW + 3, y);
+          }}
+
+          // Column totals (below pitch)
+          for (let c = 0; c < data.grid_cols; c++) {{
+            let colSum = 0;
+            for (let r = 0; r < data.grid_rows; r++) colSum += rawGrid[r][c];
+            const pct = Math.round(colSum / grandTotal * 100);
+            const x = padLeft + c * cellW + cellW / 2;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.fillText(pct + '%', x, padTop + PH + 2);
+          }}
+        }}
+
         /* ==========================================================
            Shared bar-chart renderer
            ========================================================== */
@@ -762,21 +804,22 @@ def off_ball_run_component(
         /* ==========================================================
            Summary-specific functions
            ========================================================== */
-        function redrawSummaryCanvas(canvas, valData, colorData, gridType) {{
+        function redrawSummaryCanvas(canvas, valData, colorData, rawGrid, gridType) {{
           const ctx = canvas.getContext('2d');
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvasW, canvasH);
+          ctx.fillRect(0, 0, sumCanvasW, sumCanvasH);
           drawPitch(ctx);
           drawSummaryHeatmapGrid(ctx, valData, colorData);
+          drawMarginals(ctx, rawGrid);
           drawSelectionHighlight(ctx, summaryState.selectedCells, gridType);
         }}
 
         function redrawSummary() {{
           const s = data.summary;
-          redrawSummaryCanvas(summaryState.canvases.all, s.val_all, s.color_all, 'all');
-          redrawSummaryCanvas(summaryState.canvases.targeted, s.val_targeted, s.color_targeted, 'targeted');
-          redrawSummaryCanvas(summaryState.canvases.received, s.val_received, s.color_received, 'received');
+          redrawSummaryCanvas(summaryState.canvases.all, s.val_all, s.color_all, s.raw_all, 'all');
+          redrawSummaryCanvas(summaryState.canvases.targeted, s.val_targeted, s.color_targeted, s.raw_targeted, 'targeted');
+          redrawSummaryCanvas(summaryState.canvases.received, s.val_received, s.color_received, s.raw_received, 'received');
         }}
 
         function updateSummaryBarChart() {{
@@ -791,7 +834,7 @@ def off_ball_run_component(
           updateSummaryBarChart();
         }}
 
-        function createSummaryPitchCanvas(valData, colorData, subtitle, total, gridType) {{
+        function createSummaryPitchCanvas(valData, colorData, rawGrid, subtitle, total, gridType) {{
           const wrapper = document.createElement('div');
           wrapper.className = 'pitch-wrapper';
 
@@ -801,10 +844,10 @@ def off_ball_run_component(
           wrapper.appendChild(sub);
 
           const canvas = document.createElement('canvas');
-          canvas.width = canvasW * dpr;
-          canvas.height = canvasH * dpr;
-          canvas.style.width = canvasW + 'px';
-          canvas.style.height = canvasH + 'px';
+          canvas.width = sumCanvasW * dpr;
+          canvas.height = sumCanvasH * dpr;
+          canvas.style.width = sumCanvasW + 'px';
+          canvas.style.height = sumCanvasH + 'px';
           wrapper.appendChild(canvas);
 
           const ctx = canvas.getContext('2d');
@@ -812,9 +855,10 @@ def off_ball_run_component(
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvasW, canvasH);
+          ctx.fillRect(0, 0, sumCanvasW, sumCanvasH);
           drawPitch(ctx);
           drawSummaryHeatmapGrid(ctx, valData, colorData);
+          drawMarginals(ctx, rawGrid);
 
           canvas.addEventListener('click', function(e) {{
             const rect = canvas.getBoundingClientRect();
@@ -870,15 +914,15 @@ def off_ball_run_component(
           const row = document.createElement('div');
           row.className = 'pitches-row';
 
-          const allW = createSummaryPitchCanvas(s.val_all, s.color_all, 'All', s.total_all, 'all');
+          const allW = createSummaryPitchCanvas(s.val_all, s.color_all, s.raw_all, 'All', s.total_all, 'all');
           summaryState.canvases.all = allW.querySelector('canvas');
           row.appendChild(allW);
 
-          const tgtW = createSummaryPitchCanvas(s.val_targeted, s.color_targeted, 'Targeted', s.total_targeted, 'targeted');
+          const tgtW = createSummaryPitchCanvas(s.val_targeted, s.color_targeted, s.raw_targeted, 'Targeted', s.total_targeted, 'targeted');
           summaryState.canvases.targeted = tgtW.querySelector('canvas');
           row.appendChild(tgtW);
 
-          const rcvW = createSummaryPitchCanvas(s.val_received, s.color_received, 'Received', s.total_received, 'received');
+          const rcvW = createSummaryPitchCanvas(s.val_received, s.color_received, s.raw_received, 'Received', s.total_received, 'received');
           summaryState.canvases.received = rcvW.querySelector('canvas');
           row.appendChild(rcvW);
 
