@@ -29,11 +29,11 @@ def off_ball_run_component(
         primary_color: str = "#006600",
         text_color: str = "#333333",
         highlight_entity: str = None,
-        pitch_width_px: int = 280,
-        pitch_height_px: int = 185,
+        pitch_width_px: int = 370,
+        pitch_height_px: int = 240,
         cols_per_row: int = 3,
         player_col: str = "player_name",
-        bar_chart_width: int = 180,
+        bar_chart_width: int = 250,
 ):
     """
     Streamlit custom component for dangerous off-ball runs heatmap on a football pitch.
