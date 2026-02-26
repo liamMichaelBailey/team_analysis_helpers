@@ -281,27 +281,33 @@ def off_ball_run_component(
 
     n_teams = len(all_team_ids)
 
+    zscore_bounds = [-0.5, 0.5, 1.5]  # boundaries between the 5 bands
+
     def compute_color_grid(grid_type):
-        """Percentile-rank each cell vs the league → 5-band color index."""
+        """Z-score each cell vs the league → 5-band color index."""
         color = np.full((grid_rows, grid_cols), -1, dtype=int)
         if n_teams == 0:
             return color.tolist()
         for r in range(grid_rows):
             for c in range(grid_cols):
-                vals = [league_pm[tid][grid_type][r][c] for tid in all_team_ids]
+                vals = np.array([league_pm[tid][grid_type][r][c] for tid in all_team_ids])
                 team_val = league_pm.get(team_id, {}).get(grid_type, np.zeros((grid_rows, grid_cols)))[r][c]
-                if max(vals) == 0:
+                if vals.max() == 0:
                     continue  # no team has runs here
-                n_below = sum(1 for v in vals if v < team_val)
-                n_equal = sum(1 for v in vals if v == team_val)
-                pct_rank = (n_below + 0.5 * n_equal) / n_teams
-                if pct_rank < 0.2:
+                mean = vals.mean()
+                std = vals.std()
+                if std == 0:
+                    z = 0.0
+                else:
+                    z = (team_val - mean) / std
+                # Bin: <-1.5 → 0, <-0.5 → 1, <0.5 → 2, <1.5 → 3, >=1.5 → 4
+                if z < -1.5:
                     color[r][c] = 0
-                elif pct_rank < 0.4:
+                elif z < -0.5:
                     color[r][c] = 1
-                elif pct_rank < 0.6:
+                elif z < 0.5:
                     color[r][c] = 2
-                elif pct_rank < 0.8:
+                elif z < 1.5:
                     color[r][c] = 3
                 else:
                     color[r][c] = 4
@@ -968,7 +974,7 @@ def off_ball_run_component(
 
           const desc = document.createElement('div');
           desc.className = 'summary-desc';
-          desc.textContent = 'Per-match values \\u00B7 Colored by league percentile';
+          desc.textContent = 'Per-match values \\u00B7 Colored by league z-score';
           group.appendChild(desc);
 
           const row = document.createElement('div');
@@ -1022,7 +1028,7 @@ def off_ball_run_component(
 
           const legendSub = document.createElement('div');
           legendSub.className = 'legend-subtitle';
-          legendSub.textContent = 'League percentile ranking';
+          legendSub.textContent = 'Compared to league average (z-score)';
           group.appendChild(legendSub);
 
           summaryArea.appendChild(group);
