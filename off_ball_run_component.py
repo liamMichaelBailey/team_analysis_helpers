@@ -146,19 +146,17 @@ def off_ball_run_component(
                 cell_players[key][player] = cell_players[key].get(player, 0) + 1
         return grid, cell_players
 
-    def compute_pct_grid_fast(df_subset):
-        """Vectorised % distribution grid (no player breakdown)."""
+    def compute_per_match_grid_fast(df_subset, n_matches):
+        """Vectorised count-per-match grid (no player breakdown)."""
         grid = np.zeros((grid_rows, grid_cols), dtype=float)
-        if len(df_subset) == 0:
+        if len(df_subset) == 0 or n_matches == 0:
             return grid
         x_vals = np.clip(df_subset['x_start'].values.astype(float), x_min, x_max - 0.001)
         y_vals = np.clip(df_subset['y_start'].values.astype(float), y_min, y_max - 0.001)
         c_idx = np.clip(((x_vals - x_min) / (x_max - x_min) * grid_cols).astype(int), 0, grid_cols - 1)
         r_idx = np.clip(((y_vals - y_min) / (y_max - y_min) * grid_rows).astype(int), 0, grid_rows - 1)
         np.add.at(grid, (r_idx, c_idx), 1)
-        total = grid.sum()
-        if total > 0:
-            grid = grid / total * 100
+        grid = grid / n_matches
         return grid
 
     # ----------------------------------------------------------------
@@ -244,18 +242,17 @@ def off_ball_run_component(
         for player, count in md["total_players"].items():
             summary_total_players[player] = summary_total_players.get(player, 0) + count
 
-    def grid_to_pct(grid):
-        total = grid.sum()
-        if total > 0:
-            return np.round(grid / total * 100, 1).tolist()
-        return np.zeros_like(grid, dtype=float).tolist()
+    n_matches_team = len(match_data) if len(match_data) > 0 else 1
 
-    summary_pct_all = grid_to_pct(summary_grid_all)
-    summary_pct_targeted = grid_to_pct(summary_grid_targeted)
-    summary_pct_received = grid_to_pct(summary_grid_received)
+    def grid_to_per_match(grid):
+        return np.round(grid / n_matches_team, 1).tolist()
+
+    summary_val_all = grid_to_per_match(summary_grid_all)
+    summary_val_targeted = grid_to_per_match(summary_grid_targeted)
+    summary_val_received = grid_to_per_match(summary_grid_received)
 
     # ----------------------------------------------------------------
-    # League comparison: compute % grids for every team, then rank
+    # League comparison: compute count-per-match grids for every team, then rank
     # ----------------------------------------------------------------
     league_mask = ((events_df['event_type'] == event_type_filter) &
                    (events_df['dangerous'] == dangerous_filter))
@@ -265,18 +262,22 @@ def off_ball_run_component(
 
     all_team_ids = league_events['team_id'].unique()
 
-    league_pct = {}  # team_id -> {"all": grid, "targeted": grid, "received": grid}
+    # Count matches per team (from the full events_df, not just filtered events)
+    team_match_counts = events_df.groupby('team_id')[match_col].nunique()
+
+    league_pm = {}  # team_id -> {"all": grid, "targeted": grid, "received": grid}
     for tid in all_team_ids:
         te = league_events[league_events['team_id'] == tid]
-        league_pct[tid] = {"all": compute_pct_grid_fast(te)}
+        n_m = int(team_match_counts.get(tid, 1)) or 1
+        league_pm[tid] = {"all": compute_per_match_grid_fast(te, n_m)}
         if 'targeted' in te.columns:
-            league_pct[tid]["targeted"] = compute_pct_grid_fast(te[te['targeted'] == True])
+            league_pm[tid]["targeted"] = compute_per_match_grid_fast(te[te['targeted'] == True], n_m)
         else:
-            league_pct[tid]["targeted"] = np.zeros((grid_rows, grid_cols), dtype=float)
+            league_pm[tid]["targeted"] = np.zeros((grid_rows, grid_cols), dtype=float)
         if 'received' in te.columns:
-            league_pct[tid]["received"] = compute_pct_grid_fast(te[te['received'] == True])
+            league_pm[tid]["received"] = compute_per_match_grid_fast(te[te['received'] == True], n_m)
         else:
-            league_pct[tid]["received"] = np.zeros((grid_rows, grid_cols), dtype=float)
+            league_pm[tid]["received"] = np.zeros((grid_rows, grid_cols), dtype=float)
 
     n_teams = len(all_team_ids)
 
@@ -287,8 +288,8 @@ def off_ball_run_component(
             return color.tolist()
         for r in range(grid_rows):
             for c in range(grid_cols):
-                vals = [league_pct[tid][grid_type][r][c] for tid in all_team_ids]
-                team_val = league_pct.get(team_id, {}).get(grid_type, np.zeros((grid_rows, grid_cols)))[r][c]
+                vals = [league_pm[tid][grid_type][r][c] for tid in all_team_ids]
+                team_val = league_pm.get(team_id, {}).get(grid_type, np.zeros((grid_rows, grid_cols)))[r][c]
                 if max(vals) == 0:
                     continue  # no team has runs here
                 n_below = sum(1 for v in vals if v < team_val)
@@ -315,9 +316,9 @@ def off_ball_run_component(
     # ----------------------------------------------------------------
     data = {
         "summary": {
-            "pct_all": summary_pct_all,
-            "pct_targeted": summary_pct_targeted,
-            "pct_received": summary_pct_received,
+            "val_all": summary_val_all,
+            "val_targeted": summary_val_targeted,
+            "val_received": summary_val_received,
             "color_all": summary_color_all,
             "color_targeted": summary_color_targeted,
             "color_received": summary_color_received,
@@ -685,12 +686,12 @@ def off_ball_run_component(
         /* ==========================================================
            Summary heatmap (discrete league colors, % text)
            ========================================================== */
-        function drawSummaryHeatmapGrid(ctx, pctData, colorData) {{
+        function drawSummaryHeatmapGrid(ctx, valData, colorData) {{
           const cellW = PW / data.grid_cols;
           const cellH = PH / data.grid_rows;
           for (let r = 0; r < data.grid_rows; r++) {{
             for (let c = 0; c < data.grid_cols; c++) {{
-              const pct = pctData[r][c];
+              const val = valData[r][c];
               const colorIdx = colorData[r][c];
               const x = padLeft + c * cellW;
               const y = padTop + (data.grid_rows - 1 - r) * cellH;
@@ -699,11 +700,11 @@ def off_ball_run_component(
                 ctx.fillStyle = LEAGUE_COLORS[colorIdx];
                 ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cellW - 2, cellH - 2, 2); ctx.fill();
               }}
-              if (pct > 0) {{
+              if (val > 0) {{
                 ctx.font = 'bold 8px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillStyle = (colorIdx === 0 || colorIdx === 4) ? '#ffffff' : data.text_color;
-                const txt = pct >= 10 ? Math.round(pct) + '%' : pct.toFixed(1) + '%';
+                const txt = val >= 10 ? Math.round(val).toString() : val.toFixed(1);
                 ctx.fillText(txt, x + cellW / 2, y + cellH / 2);
               }}
             }}
@@ -761,21 +762,21 @@ def off_ball_run_component(
         /* ==========================================================
            Summary-specific functions
            ========================================================== */
-        function redrawSummaryCanvas(canvas, pctData, colorData, gridType) {{
+        function redrawSummaryCanvas(canvas, valData, colorData, gridType) {{
           const ctx = canvas.getContext('2d');
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvasW, canvasH);
           drawPitch(ctx);
-          drawSummaryHeatmapGrid(ctx, pctData, colorData);
+          drawSummaryHeatmapGrid(ctx, valData, colorData);
           drawSelectionHighlight(ctx, summaryState.selectedCells, gridType);
         }}
 
         function redrawSummary() {{
           const s = data.summary;
-          redrawSummaryCanvas(summaryState.canvases.all, s.pct_all, s.color_all, 'all');
-          redrawSummaryCanvas(summaryState.canvases.targeted, s.pct_targeted, s.color_targeted, 'targeted');
-          redrawSummaryCanvas(summaryState.canvases.received, s.pct_received, s.color_received, 'received');
+          redrawSummaryCanvas(summaryState.canvases.all, s.val_all, s.color_all, 'all');
+          redrawSummaryCanvas(summaryState.canvases.targeted, s.val_targeted, s.color_targeted, 'targeted');
+          redrawSummaryCanvas(summaryState.canvases.received, s.val_received, s.color_received, 'received');
         }}
 
         function updateSummaryBarChart() {{
@@ -790,7 +791,7 @@ def off_ball_run_component(
           updateSummaryBarChart();
         }}
 
-        function createSummaryPitchCanvas(pctData, colorData, subtitle, total, gridType) {{
+        function createSummaryPitchCanvas(valData, colorData, subtitle, total, gridType) {{
           const wrapper = document.createElement('div');
           wrapper.className = 'pitch-wrapper';
 
@@ -813,7 +814,7 @@ def off_ball_run_component(
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvasW, canvasH);
           drawPitch(ctx);
-          drawSummaryHeatmapGrid(ctx, pctData, colorData);
+          drawSummaryHeatmapGrid(ctx, valData, colorData);
 
           canvas.addEventListener('click', function(e) {{
             const rect = canvas.getBoundingClientRect();
@@ -869,15 +870,15 @@ def off_ball_run_component(
           const row = document.createElement('div');
           row.className = 'pitches-row';
 
-          const allW = createSummaryPitchCanvas(s.pct_all, s.color_all, 'All', s.total_all, 'all');
+          const allW = createSummaryPitchCanvas(s.val_all, s.color_all, 'All', s.total_all, 'all');
           summaryState.canvases.all = allW.querySelector('canvas');
           row.appendChild(allW);
 
-          const tgtW = createSummaryPitchCanvas(s.pct_targeted, s.color_targeted, 'Targeted', s.total_targeted, 'targeted');
+          const tgtW = createSummaryPitchCanvas(s.val_targeted, s.color_targeted, 'Targeted', s.total_targeted, 'targeted');
           summaryState.canvases.targeted = tgtW.querySelector('canvas');
           row.appendChild(tgtW);
 
-          const rcvW = createSummaryPitchCanvas(s.pct_received, s.color_received, 'Received', s.total_received, 'received');
+          const rcvW = createSummaryPitchCanvas(s.val_received, s.color_received, 'Received', s.total_received, 'received');
           summaryState.canvases.received = rcvW.querySelector('canvas');
           row.appendChild(rcvW);
 
