@@ -547,12 +547,13 @@ def off_ball_run_component(
           border-radius: 2px;
         }}
 
-        /* Summary card */
+        /* Summary */
+        #summaryArea {{
+          display: flex;
+          justify-content: flex-start;
+        }}
         .summary-card {{
-          background: #fafbfc;
-          border: 1px solid #e4e8ec;
-          border-radius: 8px;
-          padding: 14px 18px 10px 18px;
+          padding: 0 0 6px 0;
         }}
         .summary-desc {{
           font-size: 10px;
@@ -727,7 +728,7 @@ def off_ball_run_component(
               const count = gridData[r][c];
               if (count === 0) continue;
               const intensity = count / globalMax;
-              const alpha = 0.1 + intensity * 0.7;
+              const alpha = 0.15 + intensity * 0.5;
               const x = padLeft + c * cellW;
               const y = padTop + (data.grid_rows - 1 - r) * cellH;
               ctx.fillStyle = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
@@ -754,8 +755,10 @@ def off_ball_run_component(
               const y = padTop + (data.grid_rows - 1 - r) * cellH;
 
               if (colorIdx >= 0) {{
+                ctx.globalAlpha = 0.65;
                 ctx.fillStyle = LEAGUE_COLORS[colorIdx];
                 ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cellW - 2, cellH - 2, 2); ctx.fill();
+                ctx.globalAlpha = 1.0;
               }}
               if (val > 0) {{
                 ctx.font = 'bold 9px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -777,8 +780,8 @@ def off_ball_run_component(
               grandTotal += rawGrid[r][c];
           if (grandTotal === 0) return;
 
-          ctx.font = '600 8px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-          ctx.fillStyle = '#888888';
+          ctx.font = 'bold 9px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.fillStyle = '#666666';
 
           // Row totals (right of pitch)
           for (let r = 0; r < data.grid_rows; r++) {{
@@ -944,7 +947,7 @@ def off_ball_run_component(
           dlBtn.onclick = function(e) {{
             e.stopPropagation();
             dlBtn.style.visibility = 'hidden';
-            html2canvas(group, {{ scale: 4, useCORS: true, backgroundColor: '#fafbfc' }}).then(function(c) {{
+            html2canvas(group, {{ scale: 5, useCORS: true, backgroundColor: '#ffffff', logging: false }}).then(function(c) {{
               const link = document.createElement('a');
               link.href = c.toDataURL('image/png');
               link.download = 'runs_season_summary.png';
@@ -1118,7 +1121,7 @@ def off_ball_run_component(
           dlBtn.onclick = function(e) {{
             e.stopPropagation();
             dlBtn.style.visibility = 'hidden';
-            html2canvas(group, {{ scale: 4, useCORS: true, backgroundColor: '#ffffff' }}).then(function(c) {{
+            html2canvas(group, {{ scale: 5, useCORS: true, backgroundColor: '#ffffff', logging: false }}).then(function(c) {{
               const link = document.createElement('a');
               link.href = c.toDataURL('image/png');
               link.download = 'runs_' + matchData.label.replace(/[^a-zA-Z0-9]/g, '_') + '.png';
@@ -1203,27 +1206,12 @@ def off_ball_run_component(
           html2canvas(exportArea, {{
             scale: 5,
             useCORS: true,
-            backgroundColor: '#ffffff'
-          }}).then(function(sourceCanvas) {{
-            const targetWidth = 3840;
-            const targetHeight = 2160;
-            const scale = Math.min(targetWidth / sourceCanvas.width, targetHeight / sourceCanvas.height);
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = targetWidth;
-            finalCanvas.height = targetHeight;
-            const finalCtx = finalCanvas.getContext('2d');
-            finalCtx.imageSmoothingEnabled = true;
-            finalCtx.imageSmoothingQuality = 'high';
-            finalCtx.fillStyle = '#ffffff';
-            finalCtx.fillRect(0, 0, targetWidth, targetHeight);
-            const drawW = sourceCanvas.width * scale;
-            const drawH = sourceCanvas.height * scale;
-            const offsetX = (targetWidth - drawW) / 2;
-            const offsetY = (targetHeight - drawH) / 2;
-            finalCtx.drawImage(sourceCanvas, offsetX, offsetY, drawW, drawH);
+            backgroundColor: '#ffffff',
+            logging: false
+          }}).then(function(canvas) {{
             const link = document.createElement('a');
             link.download = 'offball_runs_heatmap.png';
-            link.href = finalCanvas.toDataURL('image/png');
+            link.href = canvas.toDataURL('image/png');
             link.click();
           }});
         }}
