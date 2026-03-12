@@ -123,4 +123,6 @@ def get_player_event_aggregates(
         player_de_aggs[metric + '_per_90'] = (player_de_aggs[metric] / player_de_aggs[
             'playing_time_total_minutes_played']) * 90
 
+    player_de_aggs['total_minutes_played'] = player_de_aggs['playing_time_total_minutes_played']
+
     return player_de_aggs
