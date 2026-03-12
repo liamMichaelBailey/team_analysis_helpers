@@ -77,8 +77,13 @@ def ranking_component(
     # Filter to highlighted entities
     plot_df = df[df[data_point_id].isin(highlight_group)].reset_index(drop=True)
 
-    # Build entity names
+    # Build entity names + minutes played
     entity_names = plot_df[data_point_label].tolist()
+    entity_minutes = (
+        plot_df['total_minutes_played'].tolist()
+        if 'total_minutes_played' in plot_df.columns
+        else [None] * len(entity_names)
+    )
 
     # Build row data: list of { group: str | null, label: str, metric: str, values: [...] }
     rows = []
@@ -128,6 +133,7 @@ def ranking_component(
 
     data = {
         "entity_names": entity_names,
+        "entity_minutes": entity_minutes,
         "rows": rows,
         "title": plot_title,
         "text_color": text_color,
@@ -292,6 +298,13 @@ def ranking_component(
           margin-bottom: 3px;
         }}
         .download-btn:hover {{ transform: scale(1.1); }}
+        .entity-minutes {{
+          font-size: 10px;
+          font-weight: normal;
+          color: #888888;
+          display: block;
+          margin-top: 2px;
+        }}
       </style>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     </head>
@@ -349,7 +362,7 @@ def ranking_component(
           headerRow.appendChild(labelHeader);
 
           // Entity column headers
-          data.entity_names.forEach(name => {{
+          data.entity_names.forEach((name, idx) => {{
             const th = document.createElement('th');
             th.className = 'entity-header';
             th.style.width = entityColPct + '%';
@@ -371,7 +384,13 @@ def ranking_component(
             }});
             if (currentLine.length > 0) lines.push(currentLine);
 
-            th.innerHTML = lines.join('<br>');
+            // Minutes played sub-label
+            const minutes = data.entity_minutes[idx];
+            const minutesHtml = (minutes !== null && minutes !== undefined)
+              ? '<span class="entity-minutes">' + Math.round(minutes) + ' mins</span>'
+              : '';
+
+            th.innerHTML = lines.join('<br>') + minutesHtml;
 
             if (data.highlight_entity && name === data.highlight_entity) {{
               th.style.fontWeight = '900';
