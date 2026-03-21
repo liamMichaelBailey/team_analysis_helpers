@@ -14,6 +14,17 @@ def safe_json(df):
     return df_clean
 
 
+POSITION_ORDER = {
+    'GK': 0,
+    'CB': 1, 'LCB': 1, 'RCB': 1,
+    'LB': 2, 'RB': 2, 'LWB': 2, 'RWB': 2,
+    'CDM': 3, 'DM': 3, 'LDM': 3, 'RDM': 3,
+    'CM': 4, 'LCM': 4, 'RCM': 4, 'CAM': 4, 'LAM': 4, 'RAM': 4, 'AM': 4,
+    'LM': 5, 'RM': 5, 'LW': 5, 'RW': 5,
+    'CF': 6, 'ST': 6, 'LF': 6, 'RF': 6, 'SS': 6,
+}
+
+
 def ranking_component(
         df: pd.DataFrame,
         questions: dict,
@@ -74,11 +85,20 @@ def ranking_component(
             df[m + '_pct_rank'] = 1 - df[m + '_pct_rank']
         df[m + '_colour'] = pd.cut(df[m + '_pct_rank'], bins=bins, labels=False, right=True)
 
-    # Filter to highlighted entities
+    # Filter to highlighted entities and order by position
     plot_df = df[df[data_point_id].isin(highlight_group)].reset_index(drop=True)
+    if 'most_common_position' in plot_df.columns:
+        plot_df['_position_order'] = plot_df['most_common_position'].map(POSITION_ORDER).fillna(99)
+        plot_df = plot_df.sort_values('_position_order').reset_index(drop=True)
+        plot_df = plot_df.drop(columns=['_position_order'])
 
-    # Build entity names + minutes played
+    # Build entity names, positions + minutes played
     entity_names = plot_df[data_point_label].tolist()
+    entity_positions = (
+        plot_df['most_common_position'].tolist()
+        if 'most_common_position' in plot_df.columns
+        else [None] * len(entity_names)
+    )
     entity_minutes = (
         plot_df['total_minutes_played'].tolist()
         if 'total_minutes_played' in plot_df.columns
@@ -133,6 +153,7 @@ def ranking_component(
 
     data = {
         "entity_names": entity_names,
+        "entity_positions": entity_positions,
         "entity_minutes": entity_minutes,
         "rows": rows,
         "title": plot_title,
@@ -384,13 +405,19 @@ def ranking_component(
             }});
             if (currentLine.length > 0) lines.push(currentLine);
 
+            // Position sub-label
+            const position = data.entity_positions[idx];
+            const positionHtml = (position !== null && position !== undefined)
+              ? '<span class="entity-minutes">' + position + '</span>'
+              : '';
+
             // Minutes played sub-label
             const minutes = data.entity_minutes[idx];
             const minutesHtml = (minutes !== null && minutes !== undefined)
               ? '<span class="entity-minutes">' + Math.round(minutes) + ' mins</span>'
               : '';
 
-            th.innerHTML = lines.join('<br>') + minutesHtml;
+            th.innerHTML = lines.join('<br>') + positionHtml + minutesHtml;
 
             if (data.highlight_entity && name === data.highlight_entity) {{
               th.style.fontWeight = '900';

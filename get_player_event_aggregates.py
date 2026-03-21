@@ -13,6 +13,15 @@ def get_player_event_aggregates(
 
     dynamic_events_df['furthest_line_break_info'] = dynamic_events_df['furthest_line_break_type'].astype(str) + '_' + dynamic_events_df['furthest_line_break'].astype(str)
 
+    # Compute most common position per player
+    player_most_common_position = (
+        dynamic_events_df
+        .groupby(['player_id', 'team_id'], observed=True)['player_position']
+        .agg(lambda s: s.mode().iloc[0] if len(s.mode()) > 0 else None)
+        .reset_index()
+        .rename(columns={'player_position': 'most_common_position'})
+    )
+
 
 
     movement_de_aggs = (
@@ -118,8 +127,9 @@ def get_player_event_aggregates(
         ['player_id', 'team_id'], observed=True)['playing_time_total_minutes_played'].sum().reset_index()
 
     player_de_aggs = player_de_aggs.merge(player_performance_aggs, on=['player_id', 'team_id'])
+    player_de_aggs = player_de_aggs.merge(player_most_common_position, on=['player_id', 'team_id'], how='left')
 
-    for metric in player_de_aggs.columns[5:-1]:
+    for metric in player_de_aggs.columns[5:-2]:
         player_de_aggs[metric + '_per_90'] = (player_de_aggs[metric] / player_de_aggs[
             'playing_time_total_minutes_played']) * 90
 
