@@ -121,12 +121,12 @@ def radar_component(
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 10px;
+          padding: 0;
         }}
         .radar-container {{
           position: relative;
-          width: 700px;
-          height: 700px;
+          width: 900px;
+          height: 900px;
         }}
         canvas {{
           display: block;
@@ -155,39 +155,45 @@ def radar_component(
     <body>
       <div class="radar-container" id="radar-container">
         <button class="download-btn" onclick="downloadPNG()" title="Download PNG">&#11015;</button>
-        <canvas id="radar" width="700" height="700"></canvas>
+        <canvas id="radar" width="900" height="900"></canvas>
       </div>
 
       <script>
         const data = {json.dumps(data)};
         const canvas = document.getElementById('radar');
         const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
 
-        const W = canvas.width;
-        const H = canvas.height;
+        const W = 900;
+        const H = 900;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.scale(dpr, dpr);
+
         const cx = W / 2;
-        const cy = H / 2;
+        const cy = W / 2 + 15;
 
-        const innerRadius = 55;
-        const outerRadius = 260;
-        const labelRadius = outerRadius + 45;
+        const innerRadius = 30;
+        const outerRadius = 250;
+        const valueRadius = outerRadius + 22;
+        const labelRadius = outerRadius + 70;
 
         const n = data.labels.length;
         const sliceAngle = (2 * Math.PI) / n;
         const startOffset = -Math.PI / 2;
-        const gapAngle = 0.04;
 
         const ringLevels = [25, 50, 75, 100];
-        const ringColor = '#D9D9D6';
 
         function pctToRadius(pct) {{
           return innerRadius + (pct / 100) * (outerRadius - innerRadius);
         }}
 
-        // Draw background rings
-        ctx.strokeStyle = ringColor;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
+        // --- Draw percentile rings (dashed) ---
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([5, 5]);
         ringLevels.forEach(level => {{
           const r = pctToRadius(level);
           ctx.beginPath();
@@ -196,29 +202,12 @@ def radar_component(
         }});
         ctx.setLineDash([]);
 
-        // Draw ring labels on one spoke
-        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillStyle = '#888888';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        [25, 50, 75].forEach(level => {{
-          const r = pctToRadius(level);
-          ctx.fillText(level.toString(), cx, cy - r + 1);
-        }});
-        ctx.fillText('100th', cx, cy - pctToRadius(100) + 1);
-
-        // Draw inner circle fill
-        ctx.beginPath();
-        ctx.arc(cx, cy, innerRadius, 0, 2 * Math.PI);
-        ctx.fillStyle = '#f8f8f8';
-        ctx.fill();
-
-        // Draw bars
+        // --- Draw bars (filled wedges) ---
         data.percentiles.forEach((pct, i) => {{
           if (pct === null) return;
 
-          const angleStart = startOffset + i * sliceAngle + gapAngle / 2;
-          const angleEnd = startOffset + (i + 1) * sliceAngle - gapAngle / 2;
+          const angleStart = startOffset + i * sliceAngle;
+          const angleEnd = startOffset + (i + 1) * sliceAngle;
           const barRadius = pctToRadius(pct);
 
           ctx.beginPath();
@@ -226,23 +215,14 @@ def radar_component(
           ctx.arc(cx, cy, innerRadius, angleEnd, angleStart, true);
           ctx.closePath();
           ctx.fillStyle = data.bar_color;
-          ctx.globalAlpha = 0.92;
+          ctx.globalAlpha = 0.9;
           ctx.fill();
           ctx.globalAlpha = 1;
-
-          // Bar edge
-          ctx.beginPath();
-          ctx.arc(cx, cy, barRadius, angleStart, angleEnd);
-          ctx.arc(cx, cy, innerRadius, angleEnd, angleStart, true);
-          ctx.closePath();
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 2;
-          ctx.stroke();
         }});
 
-        // Draw spoke lines
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
+        // --- Draw white spoke dividers (on top of bars) ---
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2.5;
         for (let i = 0; i < n; i++) {{
           const angle = startOffset + i * sliceAngle;
           ctx.beginPath();
@@ -251,8 +231,82 @@ def radar_component(
           ctx.stroke();
         }}
 
-        // Draw metric labels
+        // --- Inner circle (white fill) ---
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // --- Percentile ring labels on one spoke (bottom-right) ---
+        // Place them along the spoke between metrics closest to ~135 degrees (bottom-right)
+        const ringLabelAngle = startOffset + Math.floor(n * 0.625) * sliceAngle + sliceAngle / 2;
+
         ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#555555';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        [25, 50, 75].forEach(level => {{
+          const r = pctToRadius(level);
+          const lx = cx + r * Math.cos(ringLabelAngle);
+          const ly = cy + r * Math.sin(ringLabelAngle);
+
+          // White background for readability
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 4;
+          ctx.strokeText(level.toString(), lx, ly);
+          ctx.fillText(level.toString(), lx, ly);
+        }});
+
+        // 100th percentile label
+        const r100 = pctToRadius(100);
+        const lx100 = cx + r100 * Math.cos(ringLabelAngle);
+        const ly100 = cy + r100 * Math.sin(ringLabelAngle);
+        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 4;
+        ctx.strokeText('100th', lx100, ly100 - 6);
+        ctx.fillText('100th', lx100, ly100 - 6);
+        ctx.strokeText('Percentile', lx100, ly100 + 6);
+        ctx.fillText('Percentile', lx100, ly100 + 6);
+
+        // --- Draw actual values (rotated along spoke, between ring and label) ---
+        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+        data.actuals.forEach((val, i) => {{
+          if (val === null) return;
+
+          const angleMid = startOffset + (i + 0.5) * sliceAngle;
+          const vx = cx + valueRadius * Math.cos(angleMid);
+          const vy = cy + valueRadius * Math.sin(angleMid);
+
+          ctx.save();
+          ctx.translate(vx, vy);
+
+          // Rotate text along the spoke, flip if in bottom half so text reads correctly
+          let rotation = angleMid;
+          const midDeg = ((angleMid * 180 / Math.PI) % 360 + 360) % 360;
+          if (midDeg > 90 && midDeg < 270) {{
+            rotation += Math.PI;
+          }}
+          ctx.rotate(rotation);
+
+          ctx.fillStyle = data.text_color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 3;
+          ctx.strokeText(String(val), 0, 0);
+          ctx.fillText(String(val), 0, 0);
+
+          ctx.restore();
+        }});
+
+        // --- Draw metric labels (uppercase, bold, green, outside) ---
         data.labels.forEach((label, i) => {{
           const angleMid = startOffset + (i + 0.5) * sliceAngle;
           const lx = cx + labelRadius * Math.cos(angleMid);
@@ -261,25 +315,23 @@ def radar_component(
           ctx.save();
           ctx.translate(lx, ly);
 
-          let angleDeg = (angleMid * 180 / Math.PI);
-          if (angleDeg > 90 || angleDeg < -90) {{
-            angleDeg += 180;
-          }}
-          // For angles in the bottom half, rotate 180 to keep text readable
+          // Rotate along spoke, flip bottom half
           let rotation = angleMid;
           const midDeg = ((angleMid * 180 / Math.PI) % 360 + 360) % 360;
           if (midDeg > 90 && midDeg < 270) {{
             rotation += Math.PI;
           }}
-
           ctx.rotate(rotation);
+
           ctx.fillStyle = data.bar_color;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
+          ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, sans-serif';
 
-          // Word-wrap labels
-          const words = label.split(' ');
-          const maxChars = 12;
+          // Word-wrap and uppercase
+          const upperLabel = label.toUpperCase();
+          const words = upperLabel.split(' ');
+          const maxChars = 14;
           const lines = [];
           let currentLine = '';
           words.forEach(word => {{
@@ -293,8 +345,7 @@ def radar_component(
           }});
           if (currentLine.length > 0) lines.push(currentLine);
 
-          const lineHeight = 13;
-          const totalHeight = lines.length * lineHeight;
+          const lineHeight = 15;
           lines.forEach((line, li) => {{
             ctx.fillText(line, 0, (li - (lines.length - 1) / 2) * lineHeight);
           }});
@@ -302,49 +353,14 @@ def radar_component(
           ctx.restore();
         }});
 
-        // Draw actual values near the outer edge of each bar
-        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
-        data.actuals.forEach((val, i) => {{
-          if (val === null) return;
-          const pct = data.percentiles[i];
-          if (pct === null) return;
-
-          const angleMid = startOffset + (i + 0.5) * sliceAngle;
-          const valRadius = pctToRadius(Math.min(pct, 100)) - 15;
-          const vr = Math.max(valRadius, innerRadius + 10);
-
-          const vx = cx + vr * Math.cos(angleMid);
-          const vy = cy + vr * Math.sin(angleMid);
-
-          ctx.save();
-          ctx.translate(vx, vy);
-
-          let rotation = angleMid;
-          const midDeg = ((angleMid * 180 / Math.PI) % 360 + 360) % 360;
-          if (midDeg > 90 && midDeg < 270) {{
-            rotation += Math.PI;
-          }}
-          ctx.rotate(rotation);
-
-          // White outline for readability
-          ctx.fillStyle = data.text_color;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 3;
-          ctx.strokeText(String(val), 0, 0);
-          ctx.fillText(String(val), 0, 0);
-
-          ctx.restore();
-        }});
-
-        // Draw title
-        ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, sans-serif';
+        // --- Title ---
+        ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.fillStyle = data.text_color;
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(data.title, cx, 25);
+        ctx.textBaseline = 'top';
+        ctx.fillText(data.title, cx, 12);
 
+        // --- Download PNG ---
         function downloadPNG() {{
           const btn = document.querySelector('.download-btn');
           if (btn) btn.style.visibility = 'hidden';
