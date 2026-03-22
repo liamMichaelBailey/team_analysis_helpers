@@ -116,10 +116,11 @@ def radar_component(
     <html>
     <head>
       <meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           background: white;
           display: flex;
           flex-direction: column;
@@ -134,30 +135,10 @@ def radar_component(
         canvas {{
           display: block;
         }}
-        .download-btn {{
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: none;
-          background: #006600;
-          color: white;
-          cursor: pointer;
-          font-size: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 10;
-        }}
-        .download-btn:hover {{ transform: scale(1.1); }}
       </style>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     </head>
     <body>
       <div class="radar-container" id="radar-container">
-        <button class="download-btn" onclick="downloadPNG()" title="Download PNG">&#11015;</button>
         <canvas id="radar" width="900" height="900"></canvas>
       </div>
 
@@ -272,7 +253,7 @@ def radar_component(
         ringLabelMpl += sliceWidth * 0.5;
         const ringLabelAngle = toCanvasAngle(ringLabelMpl);
 
-        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 10px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -288,7 +269,7 @@ def radar_component(
           ctx.strokeStyle = 'white';
           ctx.lineWidth = 3;
           ctx.fillStyle = data.text_color;
-          ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.font = 'bold 10px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
           ctx.strokeText(rl.text, lx, ly);
           ctx.fillText(rl.text, lx, ly);
         }});
@@ -296,7 +277,7 @@ def radar_component(
         // 100th Percentile label
         const lx100 = cx + ring100 * Math.cos(ringLabelAngle);
         const ly100 = cy + ring100 * Math.sin(ringLabelAngle);
-        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 10px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'left';
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 3;
@@ -326,7 +307,7 @@ def radar_component(
 
         // --- Actual values at fixed radius just inside the outer ring ---
         const fixedValueR = yToR(95);
-        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 11px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
         data.actuals.forEach((val, i) => {{
           if (val === null) return;
           const cAngle = canvasAngles[i];
@@ -373,7 +354,7 @@ def radar_component(
           ctx.rotate(spokeRotation(mplTheta[i]));
 
           ctx.fillStyle = data.bar_color;
-          ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.font = 'bold 14px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -403,7 +384,7 @@ def radar_component(
         }});
 
         // --- Title just above the top label ---
-        ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 20px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.fillStyle = data.text_color;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
@@ -412,47 +393,6 @@ def radar_component(
         // --- Grid: no x-grid, y-grid already drawn as dashed rings ---
         // Remove polar spine (nothing to do in canvas, already clean)
 
-        // --- Download PNG ---
-        function downloadPNG() {{
-          const btn = document.querySelector('.download-btn');
-          if (btn) btn.style.visibility = 'hidden';
-
-          const container = document.getElementById('radar-container');
-          html2canvas(container, {{
-            scale: 3,
-            useCORS: true,
-            backgroundColor: '#ffffff'
-          }}).then(sourceCanvas => {{
-            const tw = 1920;
-            const th = 1080;
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = tw;
-            finalCanvas.height = th;
-            const fctx = finalCanvas.getContext('2d');
-            fctx.fillStyle = '#ffffff';
-            fctx.fillRect(0, 0, tw, th);
-
-            const pad = 60;
-            const aw = tw - pad * 2;
-            const ah = th - pad * 2;
-            const sx = aw / sourceCanvas.width;
-            const sy = ah / sourceCanvas.height;
-            const fs = Math.min(sx, sy);
-            const sw = sourceCanvas.width * fs;
-            const sh = sourceCanvas.height * fs;
-            const ox = (tw - sw) / 2;
-            const oy = (th - sh) / 2;
-
-            fctx.drawImage(sourceCanvas, ox, oy, sw, sh);
-
-            const link = document.createElement('a');
-            link.href = finalCanvas.toDataURL('image/png');
-            link.download = 'radar_plot.png';
-            link.click();
-
-            if (btn) btn.style.visibility = 'visible';
-          }});
-        }}
       </script>
     </body>
     </html>

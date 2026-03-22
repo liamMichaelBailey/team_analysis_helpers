@@ -34,7 +34,8 @@ def pitch_component(
         pitch_width_px: int = 350,
         pitch_height_px: int = 230,
         cols_per_row: int = 3,
-        match_date_col: str = "match_date"
+        match_date_col: str = "match_date",
+        max_matches: int = None,
 ):
     """
     Streamlit custom component for football pitch plots showing average player positions.
@@ -160,6 +161,10 @@ def pitch_component(
     else:
         matches = sorted(avg_filtered[match_col].unique(), reverse=True)
 
+    # Limit to most recent N matches
+    if max_matches is not None and len(matches) > max_matches:
+        matches = matches[:max_matches]
+
     if match_label_col is None:
         match_label_col = match_col
 
@@ -248,10 +253,11 @@ def pitch_component(
     <html>
     <head>
       <meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           background: white;
           padding: 10px;
         }}
@@ -274,28 +280,6 @@ def pitch_component(
           align-items: center;
           position: relative;
         }}
-        .pitch-download {{
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          border: none;
-          background: #006600;
-          color: white;
-          cursor: pointer;
-          font-size: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: absolute;
-          top: 0;
-          right: 0;
-          opacity: 0;
-          transition: opacity 0.2s;
-        }}
-        .pitch-card:hover .pitch-download {{
-          opacity: 1;
-        }}
-        .pitch-download:hover {{ transform: scale(1.1); }}
         .pitch-label {{
           font-size: 12px;
           font-weight: 600;
@@ -311,26 +295,9 @@ def pitch_component(
         canvas {{
           border-radius: 4px;
         }}
-        .download-btn {{
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: none;
-          background: #006600;
-          color: white;
-          cursor: pointer;
-          font-size: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 8px;
-        }}
-        .download-btn:hover {{ transform: scale(1.1); }}
       </style>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     </head>
     <body>
-      <button class="download-btn" onclick="downloadPNG()" title="Download PNG">&#11015;</button>
       <div id="export-area">
         <div class="grid" id="grid"></div>
       </div>
@@ -483,7 +450,7 @@ def pitch_component(
           ctx.stroke();
 
           // Name with white outline effect
-          ctx.font = fontWeight + ' ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.font = fontWeight + ' ' + fontSize + 'px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -554,7 +521,7 @@ def pitch_component(
           const widthText = data.width_label + ' ' + matchData.team_width + 'm';
 
           ctx.save();
-          ctx.font = '10px sans-serif';
+          ctx.font = '10px Chakra Petch, sans-serif';
           ctx.fillStyle = data.text_color;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -611,7 +578,7 @@ def pitch_component(
           // Length text
           const midX = (xMinC + xMaxC) / 2;
           const lengthText = data.length_label + ' ' + matchData.team_length + 'm';
-          ctx.font = '10px sans-serif';
+          ctx.font = '10px Chakra Petch, sans-serif';
           ctx.fillStyle = data.text_color;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
@@ -621,22 +588,6 @@ def pitch_component(
         function renderPitch(matchData) {{
           const card = document.createElement('div');
           card.className = 'pitch-card';
-
-          const dlBtn = document.createElement('button');
-          dlBtn.className = 'pitch-download';
-          dlBtn.innerHTML = '&#11015;';
-          dlBtn.title = 'Download this pitch';
-          dlBtn.onclick = function(e) {{
-            e.stopPropagation();
-            const cardCanvas = card.querySelector('canvas');
-            if (cardCanvas) {{
-              const link = document.createElement('a');
-              link.href = cardCanvas.toDataURL('image/png');
-              link.download = 'pitch_' + matchData.label.replace(/[^a-zA-Z0-9]/g, '_') + '.png';
-              link.click();
-            }}
-          }};
-          card.appendChild(dlBtn);
 
           const label = document.createElement('div');
           label.className = 'pitch-label';
@@ -684,48 +635,6 @@ def pitch_component(
           grid.appendChild(card);
         }});
 
-        function downloadPNG() {{
-          const downloadBtn = document.querySelector('.download-btn');
-          if (downloadBtn) downloadBtn.style.visibility = 'hidden';
-
-          const exportArea = document.getElementById('export-area');
-          html2canvas(exportArea, {{
-            scale: 5,
-            useCORS: true,
-            backgroundColor: '#ffffff'
-          }}).then(sourceCanvas => {{
-            const targetWidth = 3840;
-            const targetHeight = 2160;
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = targetWidth;
-            finalCanvas.height = targetHeight;
-            const ctx = finalCanvas.getContext('2d');
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-            const padding = 60;
-            const availableWidth = targetWidth - (padding * 2);
-            const availableHeight = targetHeight - (padding * 2);
-            const scaleX = availableWidth / sourceCanvas.width;
-            const scaleY = availableHeight / sourceCanvas.height;
-            const fitScale = Math.min(scaleX, scaleY);
-
-            const scaledWidth = sourceCanvas.width * fitScale;
-            const scaledHeight = sourceCanvas.height * fitScale;
-            const offsetX = (targetWidth - scaledWidth) / 2;
-            const offsetY = (targetHeight - scaledHeight) / 2;
-
-            ctx.drawImage(sourceCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
-
-            const link = document.createElement('a');
-            link.href = finalCanvas.toDataURL('image/png');
-            link.download = 'pitch_positions.png';
-            link.click();
-
-            if (downloadBtn) downloadBtn.style.visibility = 'visible';
-          }});
-        }}
       </script>
     </body>
     </html>

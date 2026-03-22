@@ -65,12 +65,13 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
     output_dir = os.path.dirname(os.path.abspath(output_path))
     output_name = os.path.basename(output_path)
 
-    # Inject minimal CSS — prevent scrollbars without clipping content
+    # Inject font import + CSS — prevent scrollbars without clipping content
     inject_css = (
+        '<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">'
         '<style>'
         'html, body { margin: 0; padding: 0; } '
         '::-webkit-scrollbar { display: none !important; } '
-        'body { overflow: hidden; } '
+        'body { overflow: hidden; font-family: "Chakra Petch", sans-serif; } '
         '</style>'
     )
     if '</head>' in html_string:
@@ -147,7 +148,7 @@ def _add_filled_rect(slide, left, top, width, height, fill_color):
 
 def _add_text_box(slide, left, top, width, height, text, font_size=18,
                   font_color=SC_WHITE, bold=True, alignment=PP_ALIGN.LEFT,
-                  font_name='Calibri'):
+                  font_name='Chakra Petch'):
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.word_wrap = True
@@ -198,30 +199,29 @@ def _add_section_divider(prs, section_title):
 def _add_content_slide(prs, title, image_path, subtitle=None):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
 
-    # White background for content area
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_WHITE)
-
     # Dark header bar
     _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.9), SC_DARK)
     _add_filled_rect(slide, 0, Inches(0.9), SLIDE_WIDTH, Inches(0.04),
                      SC_GREEN)
 
-    _add_text_box(slide, Inches(0.5), Inches(0.15), Inches(12), Inches(0.6),
-                  title, font_size=22, font_color=SC_WHITE, bold=True)
+    _add_text_box(slide, Inches(0.5), Inches(0.12), Inches(12), Inches(0.6),
+                  title, font_size=22, font_color=SC_WHITE, bold=True,
+                  font_name='Chakra Petch')
 
     if subtitle:
-        _add_text_box(slide, Inches(0.5), Inches(0.55), Inches(12),
-                      Inches(0.35), subtitle, font_size=11,
-                      font_color=SC_GREY, bold=False)
+        _add_text_box(slide, Inches(0.5), Inches(0.52), Inches(12),
+                      Inches(0.35), subtitle, font_size=12,
+                      font_color=SC_GREY, bold=False,
+                      font_name='Chakra Petch')
 
     if image_path and os.path.exists(image_path):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
         # Available content area (below header, with padding)
-        content_top = 1.1
-        max_w = 12.2   # inches
-        max_h = 6.1    # inches
+        content_top = 1.05
+        max_w = 12.5   # inches
+        max_h = 6.2    # inches
 
         # Calculate proportional fit
         img_aspect = img_w / img_h
@@ -243,9 +243,6 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             Inches(left), Inches(content_top),
             width=Inches(fit_w), height=Inches(fit_h),
         )
-        # Send image to back
-        ref_element = slide.shapes[0]._element
-        ref_element.addprevious(pic._element)
 
 
 def generate_report(

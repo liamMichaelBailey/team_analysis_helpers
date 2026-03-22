@@ -173,10 +173,11 @@ def ranking_component(
     <html>
     <head>
       <meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           background: white;
           padding: 0;
         }}
@@ -310,21 +311,6 @@ def ranking_component(
           color: {text_color};
           line-height: 1.2;
         }}
-        .download-btn {{
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: none;
-          background: #006600;
-          color: white;
-          cursor: pointer;
-          font-size: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 3px;
-        }}
-        .download-btn:hover {{ transform: scale(1.1); }}
         .entity-minutes {{
           font-size: 10px;
           font-weight: normal;
@@ -333,7 +319,6 @@ def ranking_component(
           margin-top: 2px;
         }}
       </style>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     </head>
     <body>
       <div class="main-container">
@@ -385,7 +370,7 @@ def ranking_component(
           // Label column header with download button
           const labelHeader = document.createElement('th');
           labelHeader.className = 'label-header';
-          labelHeader.innerHTML = '<button class="download-btn" onclick="downloadPNG()" title="Download PNG">&#11015;</button>';
+          labelHeader.innerHTML = '';
           headerRow.appendChild(labelHeader);
 
           // Entity column headers
@@ -502,54 +487,6 @@ def ranking_component(
           }});
 
           table.appendChild(tbody);
-        }}
-
-        function downloadPNG() {{
-          const downloadBtn = document.querySelector('.download-btn');
-          if (downloadBtn) downloadBtn.style.visibility = 'hidden';
-
-          const exportContainer = document.getElementById('ranking-container');
-          const scale = 3;
-
-          html2canvas(exportContainer, {{
-            scale: scale,
-            useCORS: true,
-            backgroundColor: '#ffffff'
-          }}).then(sourceCanvas => {{
-            const targetWidth = 1920;
-            const targetHeight = 1080;
-
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = targetWidth;
-            finalCanvas.height = targetHeight;
-            const ctx = finalCanvas.getContext('2d');
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-            const padding = 60;
-            const availableWidth = targetWidth - (padding * 2);
-            const availableHeight = targetHeight - (padding * 2);
-
-            const scaleX = availableWidth / sourceCanvas.width;
-            const scaleY = availableHeight / sourceCanvas.height;
-            const fitScale = Math.min(scaleX, scaleY);
-
-            const scaledWidth = sourceCanvas.width * fitScale;
-            const scaledHeight = sourceCanvas.height * fitScale;
-
-            const offsetX = (targetWidth - scaledWidth) / 2;
-            const offsetY = (targetHeight - scaledHeight) / 2;
-
-            ctx.drawImage(sourceCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
-
-            const link = document.createElement('a');
-            link.href = finalCanvas.toDataURL('image/png');
-            link.download = 'ranking_plot.png';
-            link.click();
-
-            if (downloadBtn) downloadBtn.style.visibility = 'visible';
-          }});
         }}
 
         renderTable();

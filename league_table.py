@@ -143,10 +143,11 @@ def heatmap_component(
     <html>
     <head>
       <meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{ 
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        body {{
+          font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           background: white;
           padding: 0;
         }}
@@ -264,21 +265,6 @@ def heatmap_component(
           color: {text_color};
           line-height: 1.2;
         }}
-        .download-btn {{
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: none;
-          background: #006600;
-          color: white;
-          cursor: pointer;
-          font-size: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 3px;
-        }}
-        .download-btn:hover {{ transform: scale(1.1); }}
         .metric-header-content {{
           display: flex;
           flex-direction: column;
@@ -286,7 +272,6 @@ def heatmap_component(
         }}
 
       </style>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     </head>
     <body>
       <div class="main-container">
@@ -405,7 +390,7 @@ def heatmap_component(
           const headerRow = document.createElement('tr');
           const teamHeader = document.createElement('th');
           teamHeader.style.width = sizing.team_name_pct + '%';
-          teamHeader.innerHTML = '<button class="download-btn" onclick="downloadPNG()" title="Download PNG">⬇</button>';
+          teamHeader.innerHTML = '';
           headerRow.appendChild(teamHeader);
 
 
@@ -553,61 +538,6 @@ def heatmap_component(
           }});
 
           renderTable();
-        }}
-
-        function downloadPNG() {{
-          // Hide download button before capture
-          const downloadBtn = document.querySelector('.download-btn');
-          if (downloadBtn) downloadBtn.style.visibility = 'hidden';
-
-          // Capture both table and legend with high DPI
-          const exportContainer = document.querySelector('.container');
-          const scale = 3;  // 3x scale for high DPI
-
-          html2canvas(exportContainer, {{
-            scale: scale,
-            useCORS: true,
-            backgroundColor: '#ffffff'
-          }}).then(sourceCanvas => {{
-            // Create 16:9 canvas
-            const targetWidth = 1920;
-            const targetHeight = 1080;
-
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = targetWidth;
-            finalCanvas.height = targetHeight;
-            const ctx = finalCanvas.getContext('2d');
-
-            // Fill with white background
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-            // Calculate scaling to fit content within 16:9 with padding
-            const padding = 60;
-            const availableWidth = targetWidth - (padding * 2);
-            const availableHeight = targetHeight - (padding * 2);
-
-            const scaleX = availableWidth / sourceCanvas.width;
-            const scaleY = availableHeight / sourceCanvas.height;
-            const fitScale = Math.min(scaleX, scaleY);
-
-            const scaledWidth = sourceCanvas.width * fitScale;
-            const scaledHeight = sourceCanvas.height * fitScale;
-
-            // Center the content
-            const offsetX = (targetWidth - scaledWidth) / 2;
-            const offsetY = (targetHeight - scaledHeight) / 2;
-
-            ctx.drawImage(sourceCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
-
-            const link = document.createElement('a');
-            link.href = finalCanvas.toDataURL('image/png');
-            link.download = 'heatmap.png';
-            link.click();
-
-            // Restore download button visibility
-            if (downloadBtn) downloadBtn.style.visibility = 'visible';
-          }});
         }}
 
         renderTable();
