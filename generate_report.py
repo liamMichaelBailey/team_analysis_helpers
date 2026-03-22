@@ -93,6 +93,8 @@ BG_SECTION = os.path.join(_ASSETS_DIR, 'slide9_rel_e6607ea9.png')
 LOGO_WORDMARK = os.path.join(_ASSETS_DIR, 'slide6_logo_d2b96a8f.png')
 # SC icon logo (white, transparent)
 LOGO_ICON = os.path.join(_ASSETS_DIR, 'slide6_logo_019604da.png')
+# Content slide background — white with SKILLCORNER wordmark + lines
+BG_CONTENT = os.path.join(_ASSETS_DIR, 'slide53_embed_rId3_55e09a58.png')
 
 
 def _strip_download_buttons(html_string):
@@ -370,68 +372,27 @@ def _add_section_divider(prs, section_title, section_number=None):
               width=Inches(0.22))
 
 
-def _add_line(slide, start_left, start_top, end_left, end_top,
-              color=None, width_pt=0.75):
-    """Add a thin line (connector shape) between two points."""
-    from pptx.util import Pt as PtUtil
-    if color is None:
-        color = RGBColor(0x25, 0x25, 0x25)
-    # Use a freeform connector
-    line = slide.shapes.add_connector(
-        1,  # MSO_CONNECTOR_TYPE.STRAIGHT
-        start_left, start_top, end_left, end_top
-    )
-    line.line.color.rgb = color
-    line.line.width = PtUtil(width_pt)
-    return line
-
-
 def _add_content_slide(prs, title, image_path, subtitle=None):
     """
-    Content / analysis slide — clean white background.
-
-    Design (from template screenshot):
-    - White background
-    - Bold black title top-left, subtitle below in regular weight
-    - Thin horizontal line from title area to right edge
-    - SKILLCORNER wordmark top-right (black)
-    - Thin vertical line on right edge
-    - Chart/image fills the remaining area
+    Content / analysis slide — white background with SKILLCORNER
+    branded overlay (wordmark + lines from template background PNG).
     """
     slide = prs.slides.add_slide(_get_blank_layout(prs))
 
     # White slide background
     _set_slide_bg(slide, SC_WHITE)
 
-    # Margins
-    left_margin = Inches(0.4)
-    right_margin = Inches(9.65)
-    line_color = SC_BG  # #252525
+    # Branded background overlay — SKILLCORNER wordmark + lines
+    _add_bg_image(slide, BG_CONTENT)
 
-    # Title — Chakra Petch Bold, black
-    _add_text_box(slide, left_margin, Inches(0.2), Inches(5), Inches(0.45),
+    # Title — Chakra Petch Bold, black (#252525)
+    _add_text_box(slide, Inches(0.35), Inches(0.15), Inches(5), Inches(0.45),
                   title, font_size=20, font_color=SC_BG, bold=True)
 
-    # Subtitle — Chakra Petch Regular, dark grey
-    subtitle_bottom = Inches(0.55)
+    # Subtitle — Chakra Petch Regular, grey
     if subtitle:
-        _add_text_box(slide, left_margin, Inches(0.55), Inches(5), Inches(0.25),
+        _add_text_box(slide, Inches(0.35), Inches(0.52), Inches(5), Inches(0.25),
                       subtitle, font_size=11, font_color=SC_GREY, bold=False)
-        subtitle_bottom = Inches(0.75)
-
-    # Horizontal line — from after title area to right edge
-    line_y = Inches(0.42)
-    _add_line(slide, Inches(2.8), line_y, right_margin, line_y,
-              color=line_color, width_pt=0.75)
-
-    # SKILLCORNER wordmark — top-right, black text
-    _add_text_box(slide, Inches(7.8), Inches(0.18), Inches(1.8), Inches(0.35),
-                  "SKILLCORNER", font_size=10, font_color=SC_BG, bold=True,
-                  alignment=PP_ALIGN.RIGHT)
-
-    # Vertical line — right edge, from horizontal line downward
-    _add_line(slide, right_margin, line_y, right_margin, SLIDE_HEIGHT - Inches(0.3),
-              color=line_color, width_pt=0.75)
 
     # Image — fitted proportionally into content area below title/subtitle
     if image_path and os.path.exists(image_path):
