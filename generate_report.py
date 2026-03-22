@@ -63,16 +63,30 @@ IMAGE_TOP = Inches(1.2)
 IMAGE_WIDTH = Inches(12.5)
 
 
-def _html_to_image(html_string, output_path, size=(1200, 800)):
+def _html_to_image(html_string, output_path, size=(1600, 800)):
     """Render an HTML string to a PNG image using Chrome headless."""
     chrome_path = _find_chrome()
     output_dir = os.path.dirname(os.path.abspath(output_path))
     output_name = os.path.basename(output_path)
+
+    # Inject CSS to prevent scrollbars and ensure full content capture
+    no_scroll_css = (
+        '<style>'
+        'html, body { margin: 0; padding: 0; overflow: hidden !important; '
+        'width: %dpx; height: %dpx; }'
+        '</style>' % (size[0], size[1])
+    )
+    # Insert before closing </head> or at the start of the HTML
+    if '</head>' in html_string:
+        html_string = html_string.replace('</head>', no_scroll_css + '</head>')
+    else:
+        html_string = no_scroll_css + html_string
+
     hti = Html2Image(
         browser_executable=chrome_path,
         output_path=output_dir,
         size=size,
-        custom_flags=['--no-sandbox', '--disable-gpu'],
+        custom_flags=['--no-sandbox', '--disable-gpu', '--hide-scrollbars'],
     )
     hti.screenshot(html_str=html_string, save_as=output_name)
     return output_path
@@ -146,7 +160,37 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
                       subtitle, font_size=12, font_color=SC_GREY, bold=False)
 
     if image_path and os.path.exists(image_path):
-        pic = slide.shapes.add_picture(image_path, IMAGE_LEFT, IMAGE_TOP, IMAGE_WIDTH)
+        from PIL import Image as PILImage
+        with PILImage.open(image_path) as img:
+            img_w, img_h = img.size
+
+        # Available content area on slide
+        max_w = 12.5  # inches
+        max_h = 6.0   # inches (slide is 7.5, header takes ~1.2)
+        content_top = 1.2
+
+        # Calculate proportional fit
+        img_aspect = img_w / img_h
+        area_aspect = max_w / max_h
+
+        if img_aspect > area_aspect:
+            # Image is wider than area — fit to width
+            fit_w = max_w
+            fit_h = max_w / img_aspect
+        else:
+            # Image is taller than area — fit to height
+            fit_h = max_h
+            fit_w = max_h * img_aspect
+
+        # Centre horizontally on slide
+        slide_w_inches = 13.333
+        left = (slide_w_inches - fit_w) / 2
+
+        pic = slide.shapes.add_picture(
+            image_path,
+            Inches(left), Inches(content_top),
+            width=Inches(fit_w), height=Inches(fit_h),
+        )
         ref_element = slide.shapes[0]._element
         ref_element.addprevious(pic._element)
 
