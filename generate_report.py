@@ -256,17 +256,21 @@ def _add_filled_rect(slide, left, top, width, height, fill_color):
 def _add_text_box(slide, left, top, width, height, text, font_size=18,
                   font_color=SC_WHITE, bold=True, alignment=PP_ALIGN.LEFT,
                   font_name='Chakra Petch'):
-    """Add a text box with specified font."""
+    """Add a text box with specified font set at the run level."""
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.text = text
-    p.font.size = Pt(font_size)
-    p.font.color.rgb = font_color
-    p.font.bold = bold
-    p.font.name = font_name
     p.alignment = alignment
+
+    # Use a run so font is set at run level (Google Slides ignores
+    # paragraph-level font and only reads run-level formatting)
+    run = p.add_run()
+    run.text = text
+    run.font.size = Pt(font_size)
+    run.font.color.rgb = font_color
+    run.font.bold = bold
+    run.font.name = font_name
     return txBox
 
 
