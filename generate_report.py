@@ -3,6 +3,8 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 import os
+import tempfile
+from html2image import Html2Image
 
 
 # SkillCorner brand colours
@@ -19,6 +21,15 @@ SLIDE_HEIGHT = Inches(7.5)
 IMAGE_LEFT = Inches(0.4)
 IMAGE_TOP = Inches(1.2)
 IMAGE_WIDTH = Inches(12.5)
+
+
+def _html_to_image(html_string, output_path, size=(1200, 800)):
+    """Render an HTML string to a PNG image using Chrome headless."""
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    output_name = os.path.basename(output_path)
+    hti = Html2Image(output_path=output_dir, size=size)
+    hti.screenshot(html_str=html_string, save_as=output_name)
+    return output_path
 
 
 def _add_filled_rect(slide, left, top, width, height, fill_color):
@@ -102,7 +113,8 @@ def generate_report(
         report_subtitle: str = None,
 ):
     """
-    Generate a PPTX report from pre-saved visualization images.
+    Generate a PPTX report from HTML visualizations or pre-saved images.
+    HTML strings are automatically rendered to PNG via Chrome headless.
 
     Parameters:
     -----------
@@ -112,34 +124,16 @@ def generate_report(
         Each dict has:
           - type: "content" (default) or "divider"
           - title: str
-          - image_path: str (for content slides)
-          - subtitle: str (optional, for content slides)
+          - html: str (HTML string to render — used if image_path not provided)
+          - image_path: str (path to pre-saved PNG — takes priority over html)
+          - subtitle: str (optional)
+          - size: tuple (optional, width/height for HTML rendering, default (1200, 800))
     output_path : str
         Path to save the output PPTX file.
     report_title : str, optional
         Custom title for the report.
     report_subtitle : str, optional
         Subtitle text on the title slide.
-
-    Example:
-    --------
-    generate_report(
-        team_name="Juventus",
-        sections=[
-            {"type": "divider", "title": "Team Overview Radars"},
-            {"title": "In Possession Radar", "image_path": "ip_radar.png"},
-            {"title": "Out of Possession Radar", "image_path": "oop_radar.png"},
-            {"type": "divider", "title": "In Possession Phase Overview"},
-            {"title": "Phase Profile Overview", "image_path": "ip_overview.png"},
-            {"type": "divider", "title": "Build Up Phase"},
-            {"title": "Team Build Up Metrics", "image_path": "build_up_heatmap.png"},
-            {"title": "Team Build Up Shape", "image_path": "build_up_pitch.png"},
-            {"title": "Player Build Up Metrics", "image_path": "build_up_players.png",
-             "subtitle": "Line Breaks & Off-Ball Runs Per 90"},
-        ],
-        output_path="juventus_report.pptx",
-        report_subtitle="Serie A 2025/26"
-    )
     """
     prs = Presentation()
     prs.slide_width = SLIDE_WIDTH
@@ -147,18 +141,44 @@ def generate_report(
 
     _add_title_slide(prs, team_name, report_title, report_subtitle)
 
-    for section in sections:
+    tmp_dir = tempfile.mkdtemp()
+    tmp_files = []
+
+    for i, section in enumerate(sections):
         slide_type = section.get("type", "content")
 
         if slide_type == "divider":
             _add_section_divider(prs, section.get("title", ""))
         else:
+            image_path = section.get("image_path", "")
+            html_string = section.get("html", "")
+
+            # Render HTML to PNG if no image_path provided
+            if (not image_path or not os.path.exists(image_path)) and html_string:
+                tmp_path = os.path.join(tmp_dir, f"slide_{i}.png")
+                size = section.get("size", (1200, 800))
+                _html_to_image(html_string, tmp_path, size=size)
+                image_path = tmp_path
+                tmp_files.append(tmp_path)
+
             _add_content_slide(
                 prs,
                 title=section.get("title", ""),
-                image_path=section.get("image_path", ""),
+                image_path=image_path,
                 subtitle=section.get("subtitle", None),
             )
 
     prs.save(output_path)
+
+    # Clean up temp files
+    for f in tmp_files:
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    try:
+        os.rmdir(tmp_dir)
+    except OSError:
+        pass
+
     return output_path
