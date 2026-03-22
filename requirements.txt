@@ -1,0 +1,5 @@
+pandas
+numpy
+python-pptx
+html2image
+Pillow

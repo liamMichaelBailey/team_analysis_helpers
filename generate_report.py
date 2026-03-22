@@ -78,8 +78,12 @@ CONTENT_TOP = Inches(0.875)      # Where content area begins
 # ──────────────────────────────────────────────────────────────────────
 # Branded asset paths (extracted from template)
 # ──────────────────────────────────────────────────────────────────────
-_ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           'template_assets')
+try:
+    _ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'template_assets')
+except NameError:
+    # __file__ not defined (e.g. interactive/Colab) — try cwd
+    _ASSETS_DIR = os.path.join(os.getcwd(), 'template_assets')
 
 # Dark bg with green glow — cover slides
 BG_COVER = os.path.join(_ASSETS_DIR, 'slide1_bg_6223517a.png')
@@ -221,6 +225,23 @@ def _trim_whitespace(image_path):
 # Slide helpers — directly replicating SkillCorner template
 # ──────────────────────────────────────────────────────────────────────
 
+def _get_blank_layout(prs):
+    """Find the most blank layout — prefer 0 placeholders, then by name."""
+    # First try to find a layout with 0 placeholders
+    for layout in prs.slide_layouts:
+        if len(list(layout.placeholders)) == 0:
+            return layout
+
+    # Then try by name
+    for name in ['BLANK', 'Blank']:
+        for layout in prs.slide_layouts:
+            if layout.name == name:
+                return layout
+
+    # Fallback: layout with fewest placeholders
+    return min(prs.slide_layouts, key=lambda l: len(list(l.placeholders)))
+
+
 def _add_filled_rect(slide, left, top, width, height, fill_color):
     """Add a solid-filled rectangle with no border."""
     shape = slide.shapes.add_shape(1, left, top, width, height)
@@ -283,7 +304,7 @@ def _add_title_slide(prs, team_name, report_title=None, report_subtitle=None):
     Cover slide — branded dark background with green glow,
     SC wordmark logo, matching template cover slides 6-8.
     """
-    slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
+    slide = prs.slides.add_slide(_get_blank_layout(prs))  # BLANK layout
     _set_slide_bg(slide, SC_BG)
 
     # Branded background image (dark with green glow)
@@ -320,7 +341,7 @@ def _add_section_divider(prs, section_title, section_number=None):
     Section divider — branded dark background with geometric pattern,
     large green number + white title. Matches template slide 11 style.
     """
-    slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
+    slide = prs.slides.add_slide(_get_blank_layout(prs))  # BLANK layout
     _set_slide_bg(slide, SC_BG)
 
     # Branded background image (geometric diamonds + green glow)
@@ -362,7 +383,7 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
     - SC icon logo in title bar (right side)
     - Chart/image fills the remaining white area
     """
-    slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
+    slide = prs.slides.add_slide(_get_blank_layout(prs))  # BLANK layout
 
     # White slide background
     _set_slide_bg(slide, SC_WHITE)
