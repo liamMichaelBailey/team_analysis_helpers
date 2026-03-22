@@ -144,6 +144,8 @@ def radar_component(
 
       <script>
         const data = {json.dumps(data)};
+
+        function drawRadar() {{
         const canvas = document.getElementById('radar');
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
@@ -393,6 +395,10 @@ def radar_component(
         // --- Grid: no x-grid, y-grid already drawn as dashed rings ---
         // Remove polar spine (nothing to do in canvas, already clean)
 
+        }} // end drawRadar
+
+        // Wait for Chakra Petch font to load before drawing
+        document.fonts.ready.then(() => {{ drawRadar(); }});
       </script>
     </body>
     </html>

@@ -304,6 +304,8 @@ def pitch_component(
 
       <script>
         const data = {json.dumps(data)};
+
+        function drawPitches() {{
         const grid = document.getElementById('grid');
         const dpr = 4;
         const PW = data.pitch_width_px;
@@ -635,6 +637,10 @@ def pitch_component(
           grid.appendChild(card);
         }});
 
+        }} // end drawPitches
+
+        // Wait for Chakra Petch font to load before drawing
+        document.fonts.ready.then(() => {{ drawPitches(); }});
       </script>
     </body>
     </html>

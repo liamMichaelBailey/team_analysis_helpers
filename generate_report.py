@@ -1,5 +1,7 @@
+import re
+
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from PIL import Image as PILImage
@@ -48,15 +50,73 @@ def _find_chrome():
     )
 
 
-# SkillCorner brand colours
-SC_DARK = RGBColor(0x00, 0x14, 0x00)
-SC_GREEN = RGBColor(0x00, 0xC8, 0x00)
+# ──────────────────────────────────────────────────────────────────────
+# SkillCorner brand colours (from template)
+# ──────────────────────────────────────────────────────────────────────
+SC_BG = RGBColor(0x25, 0x25, 0x25)       # #252525 — dark background
+SC_GREEN = RGBColor(0x32, 0xFE, 0x6B)    # #32FE6B — neon green accent
+SC_DARK_GREEN = RGBColor(0x00, 0xA8, 0x2F)  # #00A82F
 SC_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-SC_GREY = RGBColor(0xD9, 0xD9, 0xD6)
+SC_GREY = RGBColor(0x87, 0x87, 0x87)     # #878787
+SC_LIGHT_GREY = RGBColor(0xE8, 0xE8, 0xE8)  # #E8E8E8
 
-# Widescreen 16:9 dimensions
-SLIDE_WIDTH = Inches(13.333)
-SLIDE_HEIGHT = Inches(7.5)
+# Template slide dimensions (10 x 5.625 inches — standard 16:9)
+SLIDE_WIDTH = Inches(10)
+SLIDE_HEIGHT = Inches(5.625)
+
+
+def _strip_download_buttons(html_string):
+    """Remove download/export buttons from HTML before rendering."""
+    # Remove button elements with download-related classes or text
+    html_string = re.sub(
+        r'<button[^>]*class="[^"]*download[^"]*"[^>]*>.*?</button>',
+        '', html_string, flags=re.IGNORECASE | re.DOTALL
+    )
+    html_string = re.sub(
+        r'<button[^>]*onclick="[^"]*download[^"]*"[^>]*>.*?</button>',
+        '', html_string, flags=re.IGNORECASE | re.DOTALL
+    )
+    # Remove any remaining buttons with download/export text
+    html_string = re.sub(
+        r'<button[^>]*>.*?(?:download|export|save\s+png).*?</button>',
+        '', html_string, flags=re.IGNORECASE | re.DOTALL
+    )
+    # Remove anchor tags styled as download buttons
+    html_string = re.sub(
+        r'<a[^>]*download[^>]*>.*?</a>',
+        '', html_string, flags=re.IGNORECASE | re.DOTALL
+    )
+    # Remove CSS rules for download buttons (avoid rendering artefacts)
+    html_string = re.sub(
+        r'\.download-btn\s*\{[^}]*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    html_string = re.sub(
+        r'\.download-button\s*\{[^}]*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    html_string = re.sub(
+        r'\.pitch-download\s*\{[^}]*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    html_string = re.sub(
+        r'\.download-button::before\s*\{[^}]*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    html_string = re.sub(
+        r'\.download-button:hover\s*\{[^}]*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    html_string = re.sub(
+        r'[^{]*\.pitch-download[^{]*\{[^}]*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    # Remove downloadPNG function definitions
+    html_string = re.sub(
+        r'function\s+downloadPNG\s*\(\)\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}',
+        '', html_string, flags=re.IGNORECASE
+    )
+    return html_string
 
 
 def _html_to_image(html_string, output_path, size=(1400, 900)):
@@ -65,13 +125,20 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
     output_dir = os.path.dirname(os.path.abspath(output_path))
     output_name = os.path.basename(output_path)
 
-    # Inject font import + CSS — prevent scrollbars without clipping content
+    # Strip download buttons
+    html_string = _strip_download_buttons(html_string)
+
+    # Inject font import + CSS — hide scrollbars, dark bg to match slides
     inject_css = (
-        '<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">'
+        '<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:'
+        'wght@300;400;500;600;700&display=swap" rel="stylesheet">'
         '<style>'
-        'html, body { margin: 0; padding: 0; } '
-        '::-webkit-scrollbar { display: none !important; } '
-        'body { overflow: hidden; font-family: "Chakra Petch", sans-serif; } '
+        'html, body { margin: 0; padding: 0; background: transparent; '
+        'overflow: hidden; } '
+        '::-webkit-scrollbar { display: none !important; '
+        'width: 0 !important; height: 0 !important; } '
+        'body { font-family: "Chakra Petch", sans-serif; '
+        '-ms-overflow-style: none; scrollbar-width: none; } '
         '</style>'
     )
     if '</head>' in html_string:
@@ -88,43 +155,44 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
             '--disable-gpu',
             '--hide-scrollbars',
             '--force-device-scale-factor=2',
+            '--virtual-time-budget=5000',
+            '--default-background-color=00000000',
         ],
     )
     hti.screenshot(html_str=html_string, save_as=output_name)
 
-    # Trim bottom whitespace so images fit slides tightly
+    # Trim whitespace so images fit slides tightly
     _trim_whitespace(output_path)
 
     return output_path
 
 
 def _trim_whitespace(image_path):
-    """Crop trailing white/transparent space from bottom and right of image."""
+    """Crop trailing white/transparent space from bottom and right."""
     with PILImage.open(image_path) as img:
-        # Convert to RGBA for consistent handling
         img = img.convert('RGBA')
         pixels = img.load()
         w, h = img.size
 
-        # Find bottom boundary — scan upward for first non-white row
+        # Find bottom boundary
         bottom = h
         for y in range(h - 1, -1, -1):
             row_has_content = False
-            for x in range(0, w, 4):  # Sample every 4th pixel for speed
+            for x in range(0, w, 4):
                 r, g, b, a = pixels[x, y]
                 if a > 10 and not (r > 250 and g > 250 and b > 250):
                     row_has_content = True
                     break
             if row_has_content:
-                bottom = y + 2  # 2px margin
+                bottom = y + 2
                 break
 
-        # Find right boundary — scan leftward for first non-white column
+        # Find right boundary
         right = w
         for x in range(w - 1, -1, -1):
             col_has_content = False
-            for y in range(0, h, 4):
-                r, g, b, a = pixels[x, y]
+            for y_s in range(0, h, 4):
+                r, g, b, a = pixels[x, y_s]
                 if a > 10 and not (r > 250 and g > 250 and b > 250):
                     col_has_content = True
                     break
@@ -132,13 +200,17 @@ def _trim_whitespace(image_path):
                 right = x + 2
                 break
 
-        # Only crop if there's meaningful whitespace to remove
         if bottom < h - 10 or right < w - 10:
             cropped = img.crop((0, 0, min(right, w), min(bottom, h)))
             cropped.save(image_path)
 
 
+# ──────────────────────────────────────────────────────────────────────
+# Slide helpers — match SkillCorner template design
+# ──────────────────────────────────────────────────────────────────────
+
 def _add_filled_rect(slide, left, top, width, height, fill_color):
+    """Add a solid-filled rectangle with no border."""
     shape = slide.shapes.add_shape(1, left, top, width, height)
     shape.fill.solid()
     shape.fill.fore_color.rgb = fill_color
@@ -149,6 +221,7 @@ def _add_filled_rect(slide, left, top, width, height, fill_color):
 def _add_text_box(slide, left, top, width, height, text, font_size=18,
                   font_color=SC_WHITE, bold=True, alignment=PP_ALIGN.LEFT,
                   font_name='Chakra Petch'):
+    """Add a text box with Chakra Petch font."""
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.word_wrap = True
@@ -163,67 +236,99 @@ def _add_text_box(slide, left, top, width, height, text, font_size=18,
 
 
 def _add_title_slide(prs, team_name, report_title=None, report_subtitle=None):
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_DARK)
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.08), SC_GREEN)
+    """Cover slide matching SkillCorner template style."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank layout
 
+    # Full dark background
+    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_BG)
+
+    # Top green accent line
+    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.06), SC_GREEN)
+
+    # Title
     title_text = report_title if report_title else f"{team_name} Analysis Report"
-    _add_text_box(slide, Inches(0.8), Inches(2.2), Inches(11), Inches(1.5),
-                  title_text, font_size=40, font_color=SC_WHITE, bold=True)
+    _add_text_box(slide, Inches(0.6), Inches(1.6), Inches(8.5), Inches(1.2),
+                  title_text, font_size=36, font_color=SC_WHITE, bold=True)
 
-    _add_filled_rect(slide, Inches(0.8), Inches(3.5), Inches(3), Inches(0.06),
-                     SC_GREEN)
+    # Green accent bar under title
+    _add_filled_rect(slide, Inches(0.6), Inches(2.7), Inches(2.2),
+                     Inches(0.05), SC_GREEN)
 
+    # Subtitle
     subtitle_text = report_subtitle if report_subtitle else team_name
-    _add_text_box(slide, Inches(0.8), Inches(3.8), Inches(11), Inches(1),
-                  subtitle_text, font_size=20, font_color=SC_GREY, bold=False)
+    _add_text_box(slide, Inches(0.6), Inches(2.95), Inches(8.5), Inches(0.8),
+                  subtitle_text, font_size=16, font_color=SC_GREEN, bold=False)
 
-    _add_filled_rect(slide, 0, SLIDE_HEIGHT - Inches(0.08), SLIDE_WIDTH,
-                     Inches(0.08), SC_GREEN)
-
-
-def _add_section_divider(prs, section_title):
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_DARK)
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.08), SC_GREEN)
-    _add_filled_rect(slide, 0, SLIDE_HEIGHT - Inches(0.08), SLIDE_WIDTH,
-                     Inches(0.08), SC_GREEN)
-
-    _add_text_box(slide, Inches(0.8), Inches(2.8), Inches(11), Inches(1.5),
-                  section_title, font_size=36, font_color=SC_WHITE, bold=True)
-
-    _add_filled_rect(slide, Inches(0.8), Inches(4.2), Inches(2.5),
+    # Bottom green accent line
+    _add_filled_rect(slide, 0, SLIDE_HEIGHT - Inches(0.06), SLIDE_WIDTH,
                      Inches(0.06), SC_GREEN)
 
 
-def _add_content_slide(prs, title, image_path, subtitle=None):
+def _add_section_divider(prs, section_title, section_number=None):
+    """Section divider slide matching template style — large green number."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
 
-    # Dark header bar
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.9), SC_DARK)
-    _add_filled_rect(slide, 0, Inches(0.9), SLIDE_WIDTH, Inches(0.04),
+    # Full dark background
+    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_BG)
+
+    # Top + bottom green accent lines
+    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.06), SC_GREEN)
+    _add_filled_rect(slide, 0, SLIDE_HEIGHT - Inches(0.06), SLIDE_WIDTH,
+                     Inches(0.06), SC_GREEN)
+
+    # Large green section number (if provided)
+    if section_number is not None:
+        _add_text_box(slide, Inches(0.6), Inches(1.0), Inches(3), Inches(1.8),
+                      str(section_number).zfill(2), font_size=72,
+                      font_color=SC_GREEN, bold=True)
+
+    # Section title
+    title_top = Inches(1.2) if section_number is None else Inches(2.8)
+    _add_text_box(slide, Inches(0.6), title_top, Inches(8.5), Inches(1.2),
+                  section_title, font_size=30, font_color=SC_WHITE, bold=True)
+
+    # Green accent bar
+    bar_top = title_top + Inches(1.3)
+    _add_filled_rect(slide, Inches(0.6), bar_top, Inches(2), Inches(0.05),
                      SC_GREEN)
 
-    _add_text_box(slide, Inches(0.5), Inches(0.12), Inches(12), Inches(0.6),
-                  title, font_size=22, font_color=SC_WHITE, bold=True,
-                  font_name='Chakra Petch')
 
+def _add_content_slide(prs, title, image_path, subtitle=None):
+    """Content slide with dark header bar and image fitted to available area."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    # Full dark background
+    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_BG)
+
+    # Header bar (darker strip at top)
+    header_h = Inches(0.65)
+    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, header_h, SC_BG)
+
+    # Green line under header
+    _add_filled_rect(slide, 0, header_h, SLIDE_WIDTH, Inches(0.03), SC_GREEN)
+
+    # Title text
+    _add_text_box(slide, Inches(0.4), Inches(0.1), Inches(9), Inches(0.45),
+                  title, font_size=18, font_color=SC_WHITE, bold=True)
+
+    # Subtitle
     if subtitle:
-        _add_text_box(slide, Inches(0.5), Inches(0.52), Inches(12),
-                      Inches(0.35), subtitle, font_size=12,
-                      font_color=SC_GREY, bold=False,
-                      font_name='Chakra Petch')
+        _add_text_box(slide, Inches(0.4), Inches(0.4), Inches(9),
+                      Inches(0.25), subtitle, font_size=10,
+                      font_color=SC_GREY, bold=False)
 
+    # Image — fitted proportionally into content area
     if image_path and os.path.exists(image_path):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
-        # Available content area (below header, with padding)
-        content_top = 1.05
-        max_w = 12.5   # inches
-        max_h = 6.2    # inches
+        # Content area below header
+        content_top = 0.78
+        content_pad = 0.3
+        max_w = 10.0 - (content_pad * 2)  # inches
+        max_h = 5.625 - content_top - content_pad  # inches
 
-        # Calculate proportional fit
+        # Proportional fit
         img_aspect = img_w / img_h
         area_aspect = max_w / max_h
 
@@ -234,16 +339,19 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             fit_h = max_h
             fit_w = max_h * img_aspect
 
-        # Centre on slide
-        slide_w = 13.333
-        left = (slide_w - fit_w) / 2
+        # Centre horizontally
+        left = (10.0 - fit_w) / 2
 
-        pic = slide.shapes.add_picture(
+        slide.shapes.add_picture(
             image_path,
             Inches(left), Inches(content_top),
             width=Inches(fit_w), height=Inches(fit_h),
         )
 
+
+# ──────────────────────────────────────────────────────────────────────
+# Main report generator
+# ──────────────────────────────────────────────────────────────────────
 
 def generate_report(
         team_name: str,
@@ -251,13 +359,14 @@ def generate_report(
         output_path: str = "team_report.pptx",
         report_title: str = None,
         report_subtitle: str = None,
+        template_path: str = None,
 ):
     """
     Generate a PPTX report from HTML visualizations or pre-saved images.
     HTML strings are automatically rendered to PNG via Chrome headless.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     team_name : str
         The team name for the report.
     sections : list of dict
@@ -274,27 +383,42 @@ def generate_report(
         Custom title for the report.
     report_subtitle : str, optional
         Subtitle text on the title slide.
+    template_path : str, optional
+        Path to a PPTX template. If provided, slide dimensions and layouts
+        are inherited from the template. All existing slides are removed.
     """
-    prs = Presentation()
-    prs.slide_width = SLIDE_WIDTH
-    prs.slide_height = SLIDE_HEIGHT
+    if template_path and os.path.exists(template_path):
+        prs = Presentation(template_path)
+        # Remove all existing slides from the template
+        while len(prs.slides) > 0:
+            rId = prs.slides._sldIdLst[0].get('r:id')
+            prs.part.drop_rel(rId)
+            prs.slides._sldIdLst.remove(prs.slides._sldIdLst[0])
+    else:
+        prs = Presentation()
+        prs.slide_width = SLIDE_WIDTH
+        prs.slide_height = SLIDE_HEIGHT
 
     _add_title_slide(prs, team_name, report_title, report_subtitle)
 
     tmp_dir = tempfile.mkdtemp()
     tmp_files = []
+    section_counter = 0
 
     for i, section in enumerate(sections):
         slide_type = section.get("type", "content")
 
         if slide_type == "divider":
-            _add_section_divider(prs, section.get("title", ""))
+            section_counter += 1
+            _add_section_divider(prs, section.get("title", ""),
+                                 section_number=section_counter)
         else:
             image_path = section.get("image_path", "")
             html_string = section.get("html", "")
 
             # Render HTML to PNG if no image_path provided
-            if (not image_path or not os.path.exists(image_path)) and html_string:
+            if (not image_path or not os.path.exists(image_path)) \
+                    and html_string:
                 tmp_path = os.path.join(tmp_dir, f"slide_{i}.png")
                 size = section.get("size", (1400, 900))
                 _html_to_image(html_string, tmp_path, size=size)
