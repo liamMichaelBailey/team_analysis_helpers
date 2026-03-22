@@ -27,6 +27,7 @@ def radar_component(
         bar_color: str = "#00C800",
         invert_metrics: list = DEFAULT_INVERTED_HEATMAP_METRICS,
         team_name_col: str = "team_shortname",
+        rounding: int = 1,
 ):
     """
     HTML/JS radar component styled after the SkillCorner radar.
@@ -51,6 +52,8 @@ def radar_component(
         Metrics where lower values are better (percentile is inverted).
     team_name_col : str
         Column name for team names.
+    rounding : int
+        Decimal places for displayed values.
     """
 
     if invert_metrics is None:
@@ -83,7 +86,7 @@ def radar_component(
 
         val = team_row[m]
         if pd.notna(val):
-            actual_values[m] = round(val, 1) if isinstance(val, float) else val
+            actual_values[m] = round(val, rounding) if isinstance(val, float) else val
         else:
             actual_values[m] = None
 
@@ -94,7 +97,7 @@ def radar_component(
             labels.append(metric_labels[m])
         else:
             label = m.replace('count_', '').replace('_phases_per_90', ' P90')
-            label = label.replace('_percentage', ' %').replace('_', ' ').title()
+            label = label.replace('_percentage', '').replace('_', ' ').title()
             labels.append(label)
 
     title = plot_title if plot_title else team_name
@@ -173,162 +176,238 @@ def radar_component(
         ctx.scale(dpr, dpr);
 
         const cx = W / 2;
-        const cy = W / 2 + 15;
+        const cy = H / 2 + 20;
 
-        const innerRadius = 30;
-        const outerRadius = 250;
-        const valueRadius = outerRadius + 22;
-        const labelRadius = outerRadius + 70;
+        // Matplotlib coordinate mapping:
+        // ylim = [0, 120], bottom = 10, so bars go from r=10 to r=10+pct
+        // Rings: 25th=35, 50th=60, 75th=85, 100th=110
+        const scale = 2.45;
+        function yToR(y) {{ return y * scale; }}
+
+        const innerR = yToR(10);        // ~24.5
+        const ring25 = yToR(35);        // ~85.8
+        const ring50 = yToR(60);        // ~147
+        const ring75 = yToR(85);        // ~208.3
+        const ring100 = yToR(110);      // ~269.5
+        const valueY = yToR(105);       // where actual values sit
+        const titleY = yToR(138);       // title position above
 
         const n = data.labels.length;
-        const sliceAngle = (2 * Math.PI) / n;
-        const startOffset = -Math.PI / 2;
+        const sliceWidth = (2 * Math.PI) / n;
 
-        const ringLevels = [25, 50, 75, 100];
+        // Replicate matplotlib theta: linspace then rotate last to front
+        // theta_offset = pi/2 (start at top), direction = -1 (clockwise)
+        // In canvas: 0 rad = right, so top = -pi/2
+        // matplotlib angle -> canvas angle: canvas_angle = -(mpl_angle) - pi/2
+        const mplTheta = [];
+        for (let i = 0; i < n; i++) {{
+          mplTheta.push((2 * Math.PI * i) / n);
+        }}
+        // Rotate last to front (like theta.insert(0, theta.pop(-1)))
+        mplTheta.unshift(mplTheta.pop());
 
-        function pctToRadius(pct) {{
-          return innerRadius + (pct / 100) * (outerRadius - innerRadius);
+        // Convert matplotlib polar angle to canvas angle
+        // mpl: theta_offset=pi/2, direction=-1
+        // So mpl visual angle = pi/2 - mpl_theta
+        // Canvas angle: 0=right, pi/2=down, so canvas = -(pi/2 - mpl_theta) = mpl_theta - pi/2
+        function mplToCanvas(mplAngle) {{
+          return -(mplAngle) + Math.PI / 2 - Math.PI / 2;
+          // Simplified: just -mplAngle, but we need the offset
+        }}
+        // Actually: in matplotlib with offset pi/2 and direction -1,
+        // the visual angle (measured from top, clockwise) = mpl_theta
+        // In canvas, top = -pi/2, clockwise = positive
+        // So canvas_angle = -pi/2 + mpl_theta (but going clockwise means we keep direction)
+        // Wait: matplotlib direction=-1 means angles increase clockwise visually
+        // So visual position for mpl_theta is at angle (-pi/2 + mpl_theta) in canvas coords
+        // but direction=-1 flips it... Let me just compute directly.
+        //
+        // matplotlib: visual_angle_from_east = theta_offset - direction * theta = pi/2 - (-1)*theta = pi/2 + theta
+        // canvas angle from east = visual_angle_from_east but canvas goes clockwise for positive y
+        // Actually matplotlib measures counterclockwise from east, canvas measures clockwise from east
+        // So: canvas_angle = -(pi/2 + mpl_theta) = -pi/2 - mpl_theta
+        //
+        // Let me verify: mpl_theta=0 should be at top (12 o'clock)
+        // canvas_angle = -pi/2 - 0 = -pi/2 = top. Correct!
+        // mpl_theta=pi/2 should be at 3 o'clock (clockwise from top because direction=-1)
+        // canvas_angle = -pi/2 - pi/2 = -pi = left. That's wrong, should be right.
+        //
+        // OK let me think again. In matplotlib:
+        // - theta_offset = pi/2 means "0 radians starts at pi/2 (top)"
+        // - theta_direction = -1 means "angles go clockwise"
+        // So theta=0 → top, theta=pi/2 → right (3 o'clock), theta=pi → bottom, theta=3pi/2 → left
+        //
+        // In canvas: angle=0 → right, angle=pi/2 → bottom, angle=pi → left, angle=-pi/2 → top
+        //
+        // Mapping: for mpl theta, the visual position is:
+        //   canvas_angle = -pi/2 + mpl_theta (going clockwise in canvas matches clockwise in mpl)
+        //   Wait: canvas positive angle = clockwise from right
+        //   mpl with direction=-1: positive theta = clockwise from top
+        //
+        // mpl_theta=0 → top → canvas -pi/2 ✓
+        // mpl_theta=pi/2 → right → canvas 0 ✓  (−pi/2 + pi/2 = 0)
+        // mpl_theta=pi → bottom → canvas pi/2 ✓  (−pi/2 + pi = pi/2)
+        //
+        // So: canvas_angle = mpl_theta - pi/2
+
+        function toCanvasAngle(mplAngle) {{
+          return mplAngle - Math.PI / 2;
         }}
 
-        // --- Draw percentile rings (dashed) ---
-        ctx.strokeStyle = '#333333';
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([5, 5]);
-        ringLevels.forEach(level => {{
-          const r = pctToRadius(level);
+        const canvasAngles = mplTheta.map(t => toCanvasAngle(t));
+
+        // --- Draw dashed percentile rings ---
+        ctx.save();
+        ctx.strokeStyle = data.text_color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 6]);
+        [ring25, ring50, ring75, ring100].forEach(r => {{
           ctx.beginPath();
           ctx.arc(cx, cy, r, 0, 2 * Math.PI);
           ctx.stroke();
         }});
         ctx.setLineDash([]);
+        ctx.restore();
 
-        // --- Draw bars (filled wedges) ---
+        // --- Draw filled bars ---
         data.percentiles.forEach((pct, i) => {{
-          if (pct === null) return;
-
-          const angleStart = startOffset + i * sliceAngle;
-          const angleEnd = startOffset + (i + 1) * sliceAngle;
-          const barRadius = pctToRadius(pct);
+          if (pct === null || pct === 0) return;
+          const barR = yToR(10 + pct);
+          const angle = canvasAngles[i];
+          const aStart = angle - sliceWidth / 2;
+          const aEnd = angle + sliceWidth / 2;
 
           ctx.beginPath();
-          ctx.arc(cx, cy, barRadius, angleStart, angleEnd);
-          ctx.arc(cx, cy, innerRadius, angleEnd, angleStart, true);
+          ctx.arc(cx, cy, barR, aStart, aEnd);
+          ctx.arc(cx, cy, innerR, aEnd, aStart, true);
           ctx.closePath();
           ctx.fillStyle = data.bar_color;
-          ctx.globalAlpha = 0.9;
+          ctx.globalAlpha = 0.95;
           ctx.fill();
-          ctx.globalAlpha = 1;
+          ctx.globalAlpha = 1.0;
         }});
 
-        // --- Draw white spoke dividers (on top of bars) ---
+        // --- Draw white spoke dividers on top of bars ---
         ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2.5;
-        for (let i = 0; i < n; i++) {{
-          const angle = startOffset + i * sliceAngle;
+        ctx.lineWidth = 2;
+        canvasAngles.forEach(angle => {{
+          const a = angle - sliceWidth / 2;
           ctx.beginPath();
-          ctx.moveTo(cx + innerRadius * Math.cos(angle), cy + innerRadius * Math.sin(angle));
-          ctx.lineTo(cx + outerRadius * Math.cos(angle), cy + outerRadius * Math.sin(angle));
+          ctx.moveTo(cx + innerR * Math.cos(a), cy + innerR * Math.sin(a));
+          ctx.lineTo(cx + ring100 * Math.cos(a), cy + ring100 * Math.sin(a));
           ctx.stroke();
-        }}
+        }});
 
-        // --- Inner circle (white fill) ---
+        // --- White inner circle ---
         ctx.beginPath();
-        ctx.arc(cx, cy, innerRadius, 0, 2 * Math.PI);
+        ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
         ctx.fillStyle = 'white';
         ctx.fill();
-        ctx.strokeStyle = '#333333';
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
 
-        // --- Percentile ring labels on one spoke (bottom-right) ---
-        // Place them along the spoke between metrics closest to ~135 degrees (bottom-right)
-        const ringLabelAngle = startOffset + Math.floor(n * 0.625) * sliceAngle + sliceAngle / 2;
+        // --- Percentile ring labels on one spoke ---
+        // In matplotlib: y_axis_pos = closest theta to 1.8 rad, offset by width*0.5
+        let ringLabelMpl = mplTheta.reduce((prev, curr) =>
+          Math.abs(curr - 1.8) < Math.abs(prev - 1.8) ? curr : prev
+        );
+        ringLabelMpl += sliceWidth * 0.5;
+        const ringLabelAngle = toCanvasAngle(ringLabelMpl);
 
-        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillStyle = '#555555';
+        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        [25, 50, 75].forEach(level => {{
-          const r = pctToRadius(level);
-          const lx = cx + r * Math.cos(ringLabelAngle);
-          const ly = cy + r * Math.sin(ringLabelAngle);
+        const ringLabels = [
+          {{ r: ring25, text: '25' }},
+          {{ r: ring50, text: '50' }},
+          {{ r: ring75, text: '75' }},
+        ];
 
-          // White background for readability
+        ringLabels.forEach(rl => {{
+          const lx = cx + rl.r * Math.cos(ringLabelAngle);
+          const ly = cy + rl.r * Math.sin(ringLabelAngle);
           ctx.strokeStyle = 'white';
-          ctx.lineWidth = 4;
-          ctx.strokeText(level.toString(), lx, ly);
-          ctx.fillText(level.toString(), lx, ly);
+          ctx.lineWidth = 3;
+          ctx.fillStyle = data.text_color;
+          ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.strokeText(rl.text, lx, ly);
+          ctx.fillText(rl.text, lx, ly);
         }});
 
-        // 100th percentile label
-        const r100 = pctToRadius(100);
-        const lx100 = cx + r100 * Math.cos(ringLabelAngle);
-        const ly100 = cy + r100 * Math.sin(ringLabelAngle);
+        // 100th Percentile label
+        const lx100 = cx + ring100 * Math.cos(ringLabelAngle);
+        const ly100 = cy + ring100 * Math.sin(ringLabelAngle);
         ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
         ctx.strokeStyle = 'white';
-        ctx.lineWidth = 4;
-        ctx.strokeText('100th', lx100, ly100 - 6);
-        ctx.fillText('100th', lx100, ly100 - 6);
-        ctx.strokeText('Percentile', lx100, ly100 + 6);
-        ctx.fillText('Percentile', lx100, ly100 + 6);
+        ctx.lineWidth = 3;
+        ctx.strokeText('100th', lx100 + 2, ly100 - 6);
+        ctx.fillText('100th', lx100 + 2, ly100 - 6);
+        ctx.strokeText('Percentile', lx100 + 2, ly100 + 6);
+        ctx.fillText('Percentile', lx100 + 2, ly100 + 6);
+        ctx.textAlign = 'center';
 
-        // --- Draw actual values (rotated along spoke, between ring and label) ---
-        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+        // --- Actual values at r≈105 (near outer edge), rotated along spoke ---
+        ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, sans-serif';
         data.actuals.forEach((val, i) => {{
           if (val === null) return;
-
-          const angleMid = startOffset + (i + 0.5) * sliceAngle;
-          const vx = cx + valueRadius * Math.cos(angleMid);
-          const vy = cy + valueRadius * Math.sin(angleMid);
+          const angle = canvasAngles[i];
+          const r = valueY;
+          const vx = cx + r * Math.cos(angle);
+          const vy = cy + r * Math.sin(angle);
 
           ctx.save();
           ctx.translate(vx, vy);
 
-          // Rotate text along the spoke, flip if in bottom half so text reads correctly
-          let rotation = angleMid;
-          const midDeg = ((angleMid * 180 / Math.PI) % 360 + 360) % 360;
-          if (midDeg > 90 && midDeg < 270) {{
-            rotation += Math.PI;
+          // Rotate along spoke. In matplotlib the text rotation is:
+          // if angle is in top half (0-90 or 270-360 deg): rotation = -angle_deg
+          // else: rotation = 180 - angle_deg
+          const angleDeg = ((angle * 180 / Math.PI) % 360 + 360) % 360;
+          let rotation;
+          if ((angleDeg >= 0 && angleDeg <= 90) || (angleDeg >= 270 && angleDeg <= 360)) {{
+            rotation = -angle;
+          }} else {{
+            rotation = Math.PI - angle;
           }}
           ctx.rotate(rotation);
 
           ctx.fillStyle = data.text_color;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
           ctx.strokeStyle = 'white';
           ctx.lineWidth = 3;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
           ctx.strokeText(String(val), 0, 0);
           ctx.fillText(String(val), 0, 0);
 
           ctx.restore();
         }});
 
-        // --- Draw metric labels (uppercase, bold, green, outside) ---
+        // --- Metric labels (uppercase, bold green, outside, rotated along spoke) ---
+        // In matplotlib: labels positioned at y=0.08 in axes coords ≈ well outside the ring
+        const labelR = ring100 + 55;
+
         data.labels.forEach((label, i) => {{
-          const angleMid = startOffset + (i + 0.5) * sliceAngle;
-          const lx = cx + labelRadius * Math.cos(angleMid);
-          const ly = cy + labelRadius * Math.sin(angleMid);
+          const angle = canvasAngles[i];
+          const lx = cx + labelR * Math.cos(angle);
+          const ly = cy + labelR * Math.sin(angle);
 
           ctx.save();
           ctx.translate(lx, ly);
 
-          // Rotate along spoke, flip bottom half
-          let rotation = angleMid;
-          const midDeg = ((angleMid * 180 / Math.PI) % 360 + 360) % 360;
-          if (midDeg > 90 && midDeg < 270) {{
-            rotation += Math.PI;
+          const angleDeg = ((angle * 180 / Math.PI) % 360 + 360) % 360;
+          let rotation;
+          if ((angleDeg >= 0 && angleDeg <= 90) || (angleDeg >= 270 && angleDeg <= 360)) {{
+            rotation = -angle;
+          }} else {{
+            rotation = Math.PI - angle;
           }}
           ctx.rotate(rotation);
 
           ctx.fillStyle = data.bar_color;
+          ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, sans-serif';
 
-          // Word-wrap and uppercase
+          // Word-wrap uppercase
           const upperLabel = label.toUpperCase();
           const words = upperLabel.split(' ');
           const maxChars = 14;
@@ -345,7 +424,7 @@ def radar_component(
           }});
           if (currentLine.length > 0) lines.push(currentLine);
 
-          const lineHeight = 15;
+          const lineHeight = 16;
           lines.forEach((line, li) => {{
             ctx.fillText(line, 0, (li - (lines.length - 1) / 2) * lineHeight);
           }});
@@ -353,12 +432,15 @@ def radar_component(
           ctx.restore();
         }});
 
-        // --- Title ---
+        // --- Title at top ---
         ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.fillStyle = data.text_color;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText(data.title, cx, 12);
+
+        // --- Grid: no x-grid, y-grid already drawn as dashed rings ---
+        // Remove polar spine (nothing to do in canvas, already clean)
 
         // --- Download PNG ---
         function downloadPNG() {{
