@@ -364,11 +364,6 @@ def _add_section_divider(prs, section_title, section_number=None):
     _add_text_box(slide, Inches(0.6), title_top, Inches(8.5), Inches(1.2),
                   section_title, font_size=34, font_color=SC_WHITE, bold=True)
 
-    # Green accent bar
-    bar_top = title_top + Inches(1.2)
-    _add_filled_rect(slide, Inches(0.6), bar_top, Inches(2), Inches(0.05),
-                     SC_GREEN)
-
     # SC icon logo — bottom right
     _add_logo(slide, LOGO_ICON,
               SLIDE_WIDTH - Inches(0.6) - Inches(0.22),
@@ -380,6 +375,7 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
     """
     Content / analysis slide — white background with SKILLCORNER
     branded overlay (wordmark + lines from template background PNG).
+    Title area has white fill on top of the overlay so text is readable.
     """
     slide = prs.slides.add_slide(_get_blank_layout(prs))
 
@@ -389,26 +385,28 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
     # Branded background overlay — SKILLCORNER wordmark + lines
     _add_bg_image(slide, BG_CONTENT)
 
+    # White fill behind title area (on top of BG overlay, under text)
+    _add_filled_rect(slide, 0, 0, Inches(7), Inches(0.65), SC_WHITE)
+
     # Title — Chakra Petch Bold, black (#252525)
-    _add_text_box(slide, Inches(0.35), Inches(0.15), Inches(5), Inches(0.45),
+    _add_text_box(slide, Inches(0.35), Inches(0.12), Inches(6), Inches(0.4),
                   title, font_size=20, font_color=SC_BG, bold=True)
 
     # Subtitle — Chakra Petch Regular, grey
     if subtitle:
-        _add_text_box(slide, Inches(0.35), Inches(0.52), Inches(5), Inches(0.25),
-                      subtitle, font_size=11, font_color=SC_GREY, bold=False)
+        _add_text_box(slide, Inches(0.35), Inches(0.45), Inches(6), Inches(0.2),
+                      subtitle, font_size=10, font_color=SC_GREY, bold=False)
 
-    # Image — fitted proportionally into content area below title/subtitle
+    # Image — maximise available space on slide
     if image_path and os.path.exists(image_path):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
-        # Content area: below title, inside the vertical line
-        content_top_in = 0.85
-        pad_left = 0.4
-        pad_right = 0.5   # inside the vertical line
-        pad_bottom = 0.2
-        max_w = 9.65 - pad_left - pad_right  # stay inside vertical line
+        # Content area: use full width, tight padding
+        content_top_in = 0.7
+        pad_h = 0.15       # horizontal padding
+        pad_bottom = 0.1   # bottom padding
+        max_w = 9.5 - pad_h  # stay inside vertical line
         max_h = 5.625 - content_top_in - pad_bottom
 
         img_aspect = img_w / img_h
@@ -421,9 +419,8 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             fit_h = max_h
             fit_w = max_h * img_aspect
 
-        # Centre horizontally in content area
-        content_centre = pad_left + max_w / 2
-        left = content_centre - fit_w / 2
+        # Centre horizontally on slide
+        left = (9.65 - fit_w) / 2
 
         slide.shapes.add_picture(
             image_path,

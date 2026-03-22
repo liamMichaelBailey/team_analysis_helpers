@@ -198,12 +198,12 @@ def ranking_component(
           border-collapse: collapse;
           table-layout: fixed;
           width: 100%;
-          font-size: 12px;
+          font-size: 13px;
         }}
         .ranking-table th {{
           padding: 6px 4px;
           text-align: center;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: bold;
           color: {text_color};
           vertical-align: bottom;
@@ -226,7 +226,7 @@ def ranking_component(
         .ranking-table td.label-cell {{
           text-align: right;
           padding-right: 12px;
-          font-size: 11px;
+          font-size: 12px;
           color: {text_color};
           white-space: nowrap;
           overflow: hidden;
@@ -236,7 +236,7 @@ def ranking_component(
         .ranking-table td.group-cell {{
           text-align: right;
           padding-right: 12px;
-          font-size: 11px;
+          font-size: 13px;
           font-weight: bold;
           color: {text_color};
           white-space: nowrap;
@@ -274,7 +274,7 @@ def ranking_component(
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          font-size: 10px;
+          font-size: 11px;
           font-weight: bold;
           z-index: 2;
           white-space: nowrap;
@@ -412,7 +412,7 @@ def ranking_component(
 
             if (data.highlight_entity && name === data.highlight_entity) {{
               th.style.fontWeight = '900';
-              th.style.fontSize = '12px';
+              th.style.fontSize = '13px';
             }}
 
             headerRow.appendChild(th);

@@ -338,31 +338,31 @@ def heatmap_component(
 
         function getColumnSizing() {{
           const numMetrics = columnOrder.length;
-          // Use percentage-based widths for responsive layout
-          const team_name_pct = 15;  // 15% for team name column
+          // Use percentage-based widths — team name gets more space
+          const team_name_pct = numMetrics <= 5 ? 18 : 14;
           const metric_col_pct = (100 - team_name_pct) / Math.max(1, numMetrics);
 
           let cell_font_size, header_font_size, chars_per_line;
           if (numMetrics <= 3) {{
-            cell_font_size = 12;
-            header_font_size = 12;
-            chars_per_line = 14;
+            cell_font_size = 14;
+            header_font_size = 13;
+            chars_per_line = 16;
           }} else if (numMetrics <= 5) {{
-            cell_font_size = 11;
-            header_font_size = 11;
-            chars_per_line = 11;
+            cell_font_size = 13;
+            header_font_size = 12;
+            chars_per_line = 13;
           }} else if (numMetrics <= 7) {{
-            cell_font_size = 10;
+            cell_font_size = 12;
+            header_font_size = 11;
+            chars_per_line = 10;
+          }} else if (numMetrics <= 10) {{
+            cell_font_size = 11;
             header_font_size = 10;
             chars_per_line = 8;
-          }} else if (numMetrics <= 10) {{
-            cell_font_size = 9;
+          }} else {{
+            cell_font_size = 10;
             header_font_size = 9;
             chars_per_line = 6;
-          }} else {{
-            cell_font_size = 8;
-            header_font_size = 8;
-            chars_per_line = 5;
           }}
 
           return {{ metric_col_pct, cell_font_size, header_font_size, chars_per_line, team_name_pct }};
