@@ -206,50 +206,10 @@ def radar_component(
         // Rotate last to front (like theta.insert(0, theta.pop(-1)))
         mplTheta.unshift(mplTheta.pop());
 
-        // Convert matplotlib polar angle to canvas angle
-        // mpl: theta_offset=pi/2, direction=-1
-        // So mpl visual angle = pi/2 - mpl_theta
-        // Canvas angle: 0=right, pi/2=down, so canvas = -(pi/2 - mpl_theta) = mpl_theta - pi/2
-        function mplToCanvas(mplAngle) {{
-          return -(mplAngle) + Math.PI / 2 - Math.PI / 2;
-          // Simplified: just -mplAngle, but we need the offset
-        }}
-        // Actually: in matplotlib with offset pi/2 and direction -1,
-        // the visual angle (measured from top, clockwise) = mpl_theta
-        // In canvas, top = -pi/2, clockwise = positive
-        // So canvas_angle = -pi/2 + mpl_theta (but going clockwise means we keep direction)
-        // Wait: matplotlib direction=-1 means angles increase clockwise visually
-        // So visual position for mpl_theta is at angle (-pi/2 + mpl_theta) in canvas coords
-        // but direction=-1 flips it... Let me just compute directly.
-        //
-        // matplotlib: visual_angle_from_east = theta_offset - direction * theta = pi/2 - (-1)*theta = pi/2 + theta
-        // canvas angle from east = visual_angle_from_east but canvas goes clockwise for positive y
-        // Actually matplotlib measures counterclockwise from east, canvas measures clockwise from east
-        // So: canvas_angle = -(pi/2 + mpl_theta) = -pi/2 - mpl_theta
-        //
-        // Let me verify: mpl_theta=0 should be at top (12 o'clock)
-        // canvas_angle = -pi/2 - 0 = -pi/2 = top. Correct!
-        // mpl_theta=pi/2 should be at 3 o'clock (clockwise from top because direction=-1)
-        // canvas_angle = -pi/2 - pi/2 = -pi = left. That's wrong, should be right.
-        //
-        // OK let me think again. In matplotlib:
-        // - theta_offset = pi/2 means "0 radians starts at pi/2 (top)"
-        // - theta_direction = -1 means "angles go clockwise"
-        // So theta=0 → top, theta=pi/2 → right (3 o'clock), theta=pi → bottom, theta=3pi/2 → left
-        //
-        // In canvas: angle=0 → right, angle=pi/2 → bottom, angle=pi → left, angle=-pi/2 → top
-        //
-        // Mapping: for mpl theta, the visual position is:
-        //   canvas_angle = -pi/2 + mpl_theta (going clockwise in canvas matches clockwise in mpl)
-        //   Wait: canvas positive angle = clockwise from right
-        //   mpl with direction=-1: positive theta = clockwise from top
-        //
-        // mpl_theta=0 → top → canvas -pi/2 ✓
-        // mpl_theta=pi/2 → right → canvas 0 ✓  (−pi/2 + pi/2 = 0)
-        // mpl_theta=pi → bottom → canvas pi/2 ✓  (−pi/2 + pi = pi/2)
-        //
+        // Convert mpl polar angle to canvas angle
+        // mpl: theta_offset=pi/2, direction=-1 → theta=0 at top, clockwise
+        // canvas: angle=0 at right, clockwise
         // So: canvas_angle = mpl_theta - pi/2
-
         function toCanvasAngle(mplAngle) {{
           return mplAngle - Math.PI / 2;
         }}
@@ -346,29 +306,36 @@ def radar_component(
         ctx.fillText('Percentile', lx100 + 2, ly100 + 6);
         ctx.textAlign = 'center';
 
-        // --- Actual values at r≈105 (near outer edge), rotated along spoke ---
+        // --- Helper: compute canvas rotation from mpl theta ---
+        // Matplotlib set_rotation formula:
+        //   mpl_angle_deg = mplTheta * 180 / pi
+        //   if 0<=deg<=90 or 270<=deg<=360: rot = -deg (CW in mpl = CCW screen)
+        //   else: rot = 180 - deg
+        // mpl rotation is CCW degrees, canvas rotate() is CW radians
+        // So canvas_rot = -mpl_rot_deg * pi / 180
+        function spokeRotation(mplAngle) {{
+          const deg = ((mplAngle * 180 / Math.PI) % 360 + 360) % 360;
+          let mplRotDeg;
+          if ((deg >= 0 && deg <= 90) || (deg >= 270 && deg <= 360)) {{
+            mplRotDeg = -deg;
+          }} else {{
+            mplRotDeg = 180 - deg;
+          }}
+          return -mplRotDeg * Math.PI / 180;
+        }}
+
+        // --- Actual values at fixed radius just inside the outer ring ---
+        const fixedValueR = yToR(95);
         ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, sans-serif';
         data.actuals.forEach((val, i) => {{
           if (val === null) return;
-          const angle = canvasAngles[i];
-          const r = valueY;
-          const vx = cx + r * Math.cos(angle);
-          const vy = cy + r * Math.sin(angle);
+          const cAngle = canvasAngles[i];
+          const vx = cx + fixedValueR * Math.cos(cAngle);
+          const vy = cy + fixedValueR * Math.sin(cAngle);
 
           ctx.save();
           ctx.translate(vx, vy);
-
-          // Rotate along spoke. In matplotlib the text rotation is:
-          // if angle is in top half (0-90 or 270-360 deg): rotation = -angle_deg
-          // else: rotation = 180 - angle_deg
-          const angleDeg = ((angle * 180 / Math.PI) % 360 + 360) % 360;
-          let rotation;
-          if ((angleDeg >= 0 && angleDeg <= 90) || (angleDeg >= 270 && angleDeg <= 360)) {{
-            rotation = -angle;
-          }} else {{
-            rotation = Math.PI - angle;
-          }}
-          ctx.rotate(rotation);
+          ctx.rotate(spokeRotation(mplTheta[i]));
 
           ctx.fillStyle = data.text_color;
           ctx.strokeStyle = 'white';
@@ -382,25 +349,16 @@ def radar_component(
         }});
 
         // --- Metric labels (uppercase, bold green, outside, rotated along spoke) ---
-        // In matplotlib: labels positioned at y=0.08 in axes coords ≈ well outside the ring
         const labelR = ring100 + 55;
 
         data.labels.forEach((label, i) => {{
-          const angle = canvasAngles[i];
-          const lx = cx + labelR * Math.cos(angle);
-          const ly = cy + labelR * Math.sin(angle);
+          const cAngle = canvasAngles[i];
+          const lx = cx + labelR * Math.cos(cAngle);
+          const ly = cy + labelR * Math.sin(cAngle);
 
           ctx.save();
           ctx.translate(lx, ly);
-
-          const angleDeg = ((angle * 180 / Math.PI) % 360 + 360) % 360;
-          let rotation;
-          if ((angleDeg >= 0 && angleDeg <= 90) || (angleDeg >= 270 && angleDeg <= 360)) {{
-            rotation = -angle;
-          }} else {{
-            rotation = Math.PI - angle;
-          }}
-          ctx.rotate(rotation);
+          ctx.rotate(spokeRotation(mplTheta[i]));
 
           ctx.fillStyle = data.bar_color;
           ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
