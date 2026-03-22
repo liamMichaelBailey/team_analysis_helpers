@@ -3,8 +3,44 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 import os
+import shutil
+import subprocess
 import tempfile
 from html2image import Html2Image
+
+
+def _find_chrome():
+    """Find Chrome/Chromium executable, installing in Colab if needed."""
+    # Common paths
+    candidates = [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        shutil.which('google-chrome'),
+        shutil.which('chromium-browser'),
+        shutil.which('chromium'),
+    ]
+    for path in candidates:
+        if path and os.path.exists(path):
+            return path
+
+    # Auto-install in Colab
+    try:
+        import google.colab  # noqa: F401
+        subprocess.run(
+            ['apt-get', 'install', '-y', '-qq', 'chromium-browser'],
+            check=True, capture_output=True,
+        )
+        for path in ['/usr/bin/chromium-browser', '/usr/bin/chromium']:
+            if os.path.exists(path):
+                return path
+    except ImportError:
+        pass
+
+    raise FileNotFoundError(
+        "No Chrome/Chromium found. Install with: apt-get install -y chromium-browser"
+    )
 
 
 # SkillCorner brand colours
@@ -25,9 +61,15 @@ IMAGE_WIDTH = Inches(12.5)
 
 def _html_to_image(html_string, output_path, size=(1200, 800)):
     """Render an HTML string to a PNG image using Chrome headless."""
+    chrome_path = _find_chrome()
     output_dir = os.path.dirname(os.path.abspath(output_path))
     output_name = os.path.basename(output_path)
-    hti = Html2Image(output_path=output_dir, size=size)
+    hti = Html2Image(
+        browser_executable=chrome_path,
+        output_path=output_dir,
+        size=size,
+        custom_flags=['--no-sandbox', '--disable-gpu'],
+    )
     hti.screenshot(html_str=html_string, save_as=output_name)
     return output_path
 
