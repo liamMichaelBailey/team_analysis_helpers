@@ -2,6 +2,20 @@ import pandas as pd
 import json
 
 
+DEFAULT_INVERTED_HEATMAP_METRICS = [
+    # In-possession: losing the ball / playing backwards
+    'possession_loss_in_build_up_percentage',
+    'possession_loss_in_create_percentage',
+    'possession_loss_in_finish_percentage',
+    'played_back_to_build_up_from_create_percentage',
+    'played_back_to_create_from_finish_percentage',
+    # Out-of-possession: conceding shots / being pushed deeper
+    'conceded_shot_in_low_block_percentage',
+    'progressed_to_low_block_from_medium_block_percentage',
+    'progressed_to_medium_block_from_high_block_percentage',
+]
+
+
 def safe_json(df):
     def convert_value(x):
         if isinstance(x, pd.Timestamp):
@@ -27,7 +41,8 @@ def heatmap_component(
         container_width: int = 1200,
         all_metrics: list = None,
         default_metrics: list = None,
-        highlight_team: str = None
+        highlight_team: str = None,
+        invert_metrics: list = DEFAULT_INVERTED_HEATMAP_METRICS
 ):
     """
     Streamlit custom component for a team performance heatmap.
@@ -68,6 +83,9 @@ def heatmap_component(
     if default_metrics is None:
         default_metrics = metrics
 
+    if invert_metrics is None:
+        invert_metrics = DEFAULT_INVERTED_HEATMAP_METRICS
+
     if labels is None:
         labels = metrics.copy()
 
@@ -89,6 +107,8 @@ def heatmap_component(
                 if pd.isna(val):
                     row_data.append(None)
                 else:
+                    if metric in invert_metrics:
+                        val = -val
                     row_data.append(max(-2.5, min(2.5, val)))
             else:
                 row_data.append(None)

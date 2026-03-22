@@ -14,6 +14,12 @@ def safe_json(df):
     return df_clean
 
 
+DEFAULT_INVERTED_PLAYER_METRICS = [
+    'count_fouls_per_90',
+    'count_beaten_by_possession_per_90',
+    'count_beaten_by_movement_per_90',
+]
+
 POSITION_ORDER = {
     'GK': 0,
     'CB': 1, 'LCB': 1, 'RCB': 1,
@@ -35,7 +41,7 @@ def ranking_component(
         plot_title: str = None,
         text_color: str = "#333333",
         container_width: int = 1200,
-        invert_metric_ranks: list = None,
+        invert_metric_ranks: list = DEFAULT_INVERTED_PLAYER_METRICS,
         highlight_entity: str = None
 ):
     """
@@ -68,7 +74,7 @@ def ranking_component(
     """
 
     if invert_metric_ranks is None:
-        invert_metric_ranks = []
+        invert_metric_ranks = DEFAULT_INVERTED_PLAYER_METRICS
 
     BUBBLE_MAX = 550
     bins = [-0.1, 0.2, 0.4, 0.6, 0.8, 1.1]
