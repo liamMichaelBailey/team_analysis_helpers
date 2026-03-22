@@ -11,12 +11,13 @@ from html2image import Html2Image
 
 def _find_chrome():
     """Find Chrome/Chromium executable, installing in Colab if needed."""
-    # Common paths
+    # Common paths (google-chrome-stable is pre-installed in Colab)
     candidates = [
-        '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
         '/usr/bin/chromium-browser',
         '/usr/bin/chromium',
+        shutil.which('google-chrome-stable'),
         shutil.which('google-chrome'),
         shutil.which('chromium-browser'),
         shutil.which('chromium'),
@@ -25,21 +26,24 @@ def _find_chrome():
         if path and os.path.exists(path):
             return path
 
-    # Auto-install in Colab
+    # Auto-install google-chrome-stable in Colab
     try:
         import google.colab  # noqa: F401
         subprocess.run(
-            ['apt-get', 'install', '-y', '-qq', 'chromium-browser'],
+            ['bash', '-c',
+             'wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb '
+             '&& apt-get install -y -qq /tmp/chrome.deb '
+             '&& rm /tmp/chrome.deb'],
             check=True, capture_output=True,
         )
-        for path in ['/usr/bin/chromium-browser', '/usr/bin/chromium']:
-            if os.path.exists(path):
-                return path
-    except ImportError:
+        if os.path.exists('/usr/bin/google-chrome-stable'):
+            return '/usr/bin/google-chrome-stable'
+    except (ImportError, subprocess.CalledProcessError):
         pass
 
     raise FileNotFoundError(
-        "No Chrome/Chromium found. Install with: apt-get install -y chromium-browser"
+        "No Chrome/Chromium found. In Colab, google-chrome-stable should be pre-installed. "
+        "Try: !which google-chrome-stable"
     )
 
 
