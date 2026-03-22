@@ -75,6 +75,21 @@ SUBTITLE_TOP = Inches(0.503)     # Subtitle top
 SUBTITLE_HEIGHT = Inches(0.283)  # Subtitle height
 CONTENT_TOP = Inches(0.875)      # Where content area begins
 
+# ──────────────────────────────────────────────────────────────────────
+# Branded asset paths (extracted from template)
+# ──────────────────────────────────────────────────────────────────────
+_ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'template_assets')
+
+# Dark bg with green glow — cover slides
+BG_COVER = os.path.join(_ASSETS_DIR, 'slide1_bg_6223517a.png')
+# Dark bg with geometric diamonds + green glow — section dividers
+BG_SECTION = os.path.join(_ASSETS_DIR, 'slide9_rel_e6607ea9.png')
+# SKILLCORNER wordmark (white, transparent)
+LOGO_WORDMARK = os.path.join(_ASSETS_DIR, 'slide6_logo_d2b96a8f.png')
+# SC icon logo (white, transparent)
+LOGO_ICON = os.path.join(_ASSETS_DIR, 'slide6_logo_019604da.png')
+
 
 def _strip_download_buttons(html_string):
     """Remove download/export buttons from HTML before rendering."""
@@ -240,15 +255,41 @@ def _set_slide_bg(slide, color):
     fill.fore_color.rgb = color
 
 
+def _add_bg_image(slide, image_path):
+    """Add a full-slide background image (sent to back)."""
+    if image_path and os.path.exists(image_path):
+        pic = slide.shapes.add_picture(
+            image_path, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT
+        )
+        # Move to back of z-order
+        sp = pic._element
+        slide.shapes._spTree.remove(sp)
+        slide.shapes._spTree.insert(2, sp)
+
+
+def _add_logo(slide, logo_path, left, top, width=None, height=None):
+    """Add a logo image at specified position."""
+    if logo_path and os.path.exists(logo_path):
+        kwargs = {}
+        if width:
+            kwargs['width'] = width
+        if height:
+            kwargs['height'] = height
+        slide.shapes.add_picture(logo_path, left, top, **kwargs)
+
+
 def _add_title_slide(prs, team_name, report_title=None, report_subtitle=None):
     """
-    Cover slide — dark background, matching template TITLE layout.
-    Template: Chakra Petch Bold ~41pt title, 16pt subtitle in #32FE6B.
+    Cover slide — branded dark background with green glow,
+    SC wordmark logo, matching template cover slides 6-8.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
     _set_slide_bg(slide, SC_BG)
 
-    # Title — Chakra Petch Bold, large
+    # Branded background image (dark with green glow)
+    _add_bg_image(slide, BG_COVER)
+
+    # Title — Chakra Petch Bold ~41pt
     title_text = report_title if report_title else f"{team_name} Analysis Report"
     _add_text_box(slide, Inches(0.6), Inches(1.6), Inches(8.5), Inches(1.2),
                   title_text, font_size=41, font_color=SC_WHITE, bold=True)
@@ -262,16 +303,30 @@ def _add_title_slide(prs, team_name, report_title=None, report_subtitle=None):
     _add_text_box(slide, Inches(0.6), Inches(3.0), Inches(8.5), Inches(0.8),
                   subtitle_text, font_size=16, font_color=SC_GREEN, bold=False)
 
+    # SC wordmark logo — bottom left (template position)
+    _add_logo(slide, LOGO_WORDMARK,
+              Inches(0.6), SLIDE_HEIGHT - Inches(0.45),
+              width=Inches(1.17))
+
+    # SC icon logo — bottom right
+    _add_logo(slide, LOGO_ICON,
+              SLIDE_WIDTH - Inches(0.6) - Inches(0.22),
+              SLIDE_HEIGHT - Inches(0.5),
+              width=Inches(0.22))
+
 
 def _add_section_divider(prs, section_title, section_number=None):
     """
-    Section divider — dark background, large green number + white title.
-    Template style: Chakra Petch Bold ~65-80pt number, ~34pt title.
+    Section divider — branded dark background with geometric pattern,
+    large green number + white title. Matches template slide 11 style.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
     _set_slide_bg(slide, SC_BG)
 
-    # Large green section number
+    # Branded background image (geometric diamonds + green glow)
+    _add_bg_image(slide, BG_SECTION)
+
+    # Large green section number — Chakra Petch Bold ~72pt
     if section_number is not None:
         _add_text_box(slide, Inches(0.6), Inches(0.8), Inches(3), Inches(1.8),
                       str(section_number).zfill(2), font_size=72,
@@ -287,6 +342,12 @@ def _add_section_divider(prs, section_title, section_number=None):
     _add_filled_rect(slide, Inches(0.6), bar_top, Inches(2), Inches(0.05),
                      SC_GREEN)
 
+    # SC icon logo — bottom right
+    _add_logo(slide, LOGO_ICON,
+              SLIDE_WIDTH - Inches(0.6) - Inches(0.22),
+              SLIDE_HEIGHT - Inches(0.5),
+              width=Inches(0.22))
+
 
 def _add_content_slide(prs, title, image_path, subtitle=None):
     """
@@ -296,7 +357,9 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
     - #252525 title bar at top (left=0.326in, top=0.082in, h=0.572in)
     - Chakra Petch Bold ~23pt white title text
     - Chakra Petch ~13pt subtitle
+    - Green #32FF6A accent line under title bar
     - Content starts at top=0.875in
+    - SC icon logo in title bar (right side)
     - Chart/image fills the remaining white area
     """
     slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
@@ -304,25 +367,31 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
     # White slide background
     _set_slide_bg(slide, SC_WHITE)
 
-    # Title bar — #252525 filled rectangle spanning full width
-    # Template: title placeholder at (0.326in, 0.082in), h=0.572in
+    # Title bar — #252525 filled rectangle matching template position
+    title_bar_width = Inches(9.375)
     _add_filled_rect(slide, TITLE_LEFT, TITLE_TOP,
-                     Inches(9.375), TITLE_HEIGHT, SC_BG)
+                     title_bar_width, TITLE_HEIGHT, SC_BG)
 
     # Green accent line under title bar
     green_line_top = TITLE_TOP + TITLE_HEIGHT
     _add_filled_rect(slide, TITLE_LEFT, green_line_top,
-                     Inches(9.375), Inches(0.03), SC_GREEN_LINE)
+                     title_bar_width, Inches(0.03), SC_GREEN_LINE)
 
     # Title text — Chakra Petch Bold ~23pt, white
-    _add_text_box(slide, Inches(0.45), Inches(0.13), Inches(9), Inches(0.45),
+    _add_text_box(slide, Inches(0.45), Inches(0.13), Inches(8.5), Inches(0.45),
                   title, font_size=23, font_color=SC_WHITE, bold=True)
 
     # Subtitle — Chakra Petch ~13pt, white
     if subtitle:
         _add_text_box(slide, Inches(0.45), SUBTITLE_TOP,
-                      Inches(9), SUBTITLE_HEIGHT,
+                      Inches(8.5), SUBTITLE_HEIGHT,
                       subtitle, font_size=13, font_color=SC_WHITE, bold=False)
+
+    # SC icon logo in title bar — right side
+    _add_logo(slide, LOGO_ICON,
+              TITLE_LEFT + title_bar_width - Inches(0.55),
+              TITLE_TOP + Inches(0.08),
+              height=Inches(0.4))
 
     # Image — fitted proportionally into white content area
     if image_path and os.path.exists(image_path):
@@ -331,8 +400,8 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
 
         # Content area: starts at CONTENT_TOP, with small padding
         content_top_in = 0.875
-        pad = 0.2
-        max_w = 10.0 - TITLE_LEFT.inches - pad  # match title bar width
+        pad = 0.15
+        max_w = 10.0 - TITLE_LEFT.inches - pad
         max_h = 5.625 - content_top_in - pad
 
         img_aspect = img_w / img_h
@@ -370,6 +439,9 @@ def generate_report(
     """
     Generate a PPTX report from HTML visualizations or pre-saved images.
     HTML strings are automatically rendered to PNG via Chrome headless.
+
+    Uses SkillCorner branded assets (backgrounds, logos) extracted from
+    the template and stored in template_assets/.
 
     Parameters
     ----------
