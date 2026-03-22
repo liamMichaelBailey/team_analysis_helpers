@@ -51,23 +51,33 @@ def _find_chrome():
 
 
 # ──────────────────────────────────────────────────────────────────────
-# SkillCorner brand colours (from template)
+# SkillCorner brand colours — exact values from template
 # ──────────────────────────────────────────────────────────────────────
-SC_BG = RGBColor(0x25, 0x25, 0x25)       # #252525 — dark background
-SC_GREEN = RGBColor(0x32, 0xFE, 0x6B)    # #32FE6B — neon green accent
+SC_BG = RGBColor(0x25, 0x25, 0x25)          # #252525 — title bar / dark panels
+SC_GREEN = RGBColor(0x32, 0xFE, 0x6B)       # #32FE6B — neon green accent
+SC_GREEN_LINE = RGBColor(0x32, 0xFF, 0x6A)  # #32FF6A — accent lines
 SC_DARK_GREEN = RGBColor(0x00, 0xA8, 0x2F)  # #00A82F
+SC_PANEL_GREY = RGBColor(0x88, 0x88, 0x88)  # #888888 — content panels
 SC_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-SC_GREY = RGBColor(0x87, 0x87, 0x87)     # #878787
+SC_GREY = RGBColor(0x87, 0x87, 0x87)        # #878787
 SC_LIGHT_GREY = RGBColor(0xE8, 0xE8, 0xE8)  # #E8E8E8
+SC_DARK_TEXT = RGBColor(0x57, 0x57, 0x57)    # #575757
 
 # Template slide dimensions (10 x 5.625 inches — standard 16:9)
 SLIDE_WIDTH = Inches(10)
 SLIDE_HEIGHT = Inches(5.625)
 
+# Template measurements (from inspecting the PPTX)
+TITLE_LEFT = Inches(0.326)       # Title bar left edge
+TITLE_TOP = Inches(0.082)        # Title bar top
+TITLE_HEIGHT = Inches(0.572)     # Title bar height
+SUBTITLE_TOP = Inches(0.503)     # Subtitle top
+SUBTITLE_HEIGHT = Inches(0.283)  # Subtitle height
+CONTENT_TOP = Inches(0.875)      # Where content area begins
+
 
 def _strip_download_buttons(html_string):
     """Remove download/export buttons from HTML before rendering."""
-    # Remove button elements with download-related classes or text
     html_string = re.sub(
         r'<button[^>]*class="[^"]*download[^"]*"[^>]*>.*?</button>',
         '', html_string, flags=re.IGNORECASE | re.DOTALL
@@ -76,17 +86,14 @@ def _strip_download_buttons(html_string):
         r'<button[^>]*onclick="[^"]*download[^"]*"[^>]*>.*?</button>',
         '', html_string, flags=re.IGNORECASE | re.DOTALL
     )
-    # Remove any remaining buttons with download/export text
     html_string = re.sub(
         r'<button[^>]*>.*?(?:download|export|save\s+png).*?</button>',
         '', html_string, flags=re.IGNORECASE | re.DOTALL
     )
-    # Remove anchor tags styled as download buttons
     html_string = re.sub(
         r'<a[^>]*download[^>]*>.*?</a>',
         '', html_string, flags=re.IGNORECASE | re.DOTALL
     )
-    # Remove CSS rules for download buttons (avoid rendering artefacts)
     html_string = re.sub(
         r'\.download-btn\s*\{[^}]*\}',
         '', html_string, flags=re.IGNORECASE
@@ -111,7 +118,6 @@ def _strip_download_buttons(html_string):
         r'[^{]*\.pitch-download[^{]*\{[^}]*\}',
         '', html_string, flags=re.IGNORECASE
     )
-    # Remove downloadPNG function definitions
     html_string = re.sub(
         r'function\s+downloadPNG\s*\(\)\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}',
         '', html_string, flags=re.IGNORECASE
@@ -125,15 +131,13 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
     output_dir = os.path.dirname(os.path.abspath(output_path))
     output_name = os.path.basename(output_path)
 
-    # Strip download buttons
     html_string = _strip_download_buttons(html_string)
 
-    # Inject font import + CSS — hide scrollbars, dark bg to match slides
     inject_css = (
         '<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:'
         'wght@300;400;500;600;700&display=swap" rel="stylesheet">'
         '<style>'
-        'html, body { margin: 0; padding: 0; background: transparent; '
+        'html, body { margin: 0; padding: 0; background: #ffffff; '
         'overflow: hidden; } '
         '::-webkit-scrollbar { display: none !important; '
         'width: 0 !important; height: 0 !important; } '
@@ -156,14 +160,11 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
             '--hide-scrollbars',
             '--force-device-scale-factor=2',
             '--virtual-time-budget=5000',
-            '--default-background-color=00000000',
         ],
     )
     hti.screenshot(html_str=html_string, save_as=output_name)
 
-    # Trim whitespace so images fit slides tightly
     _trim_whitespace(output_path)
-
     return output_path
 
 
@@ -174,31 +175,27 @@ def _trim_whitespace(image_path):
         pixels = img.load()
         w, h = img.size
 
-        # Find bottom boundary
         bottom = h
         for y in range(h - 1, -1, -1):
-            row_has_content = False
             for x in range(0, w, 4):
                 r, g, b, a = pixels[x, y]
                 if a > 10 and not (r > 250 and g > 250 and b > 250):
-                    row_has_content = True
+                    bottom = y + 2
                     break
-            if row_has_content:
-                bottom = y + 2
-                break
+            else:
+                continue
+            break
 
-        # Find right boundary
         right = w
         for x in range(w - 1, -1, -1):
-            col_has_content = False
             for y_s in range(0, h, 4):
                 r, g, b, a = pixels[x, y_s]
                 if a > 10 and not (r > 250 and g > 250 and b > 250):
-                    col_has_content = True
+                    right = x + 2
                     break
-            if col_has_content:
-                right = x + 2
-                break
+            else:
+                continue
+            break
 
         if bottom < h - 10 or right < w - 10:
             cropped = img.crop((0, 0, min(right, w), min(bottom, h)))
@@ -206,7 +203,7 @@ def _trim_whitespace(image_path):
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Slide helpers — match SkillCorner template design
+# Slide helpers — directly replicating SkillCorner template
 # ──────────────────────────────────────────────────────────────────────
 
 def _add_filled_rect(slide, left, top, width, height, fill_color):
@@ -221,7 +218,7 @@ def _add_filled_rect(slide, left, top, width, height, fill_color):
 def _add_text_box(slide, left, top, width, height, text, font_size=18,
                   font_color=SC_WHITE, bold=True, alignment=PP_ALIGN.LEFT,
                   font_name='Chakra Petch'):
-    """Add a text box with Chakra Petch font."""
+    """Add a text box with specified font."""
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.word_wrap = True
@@ -235,100 +232,109 @@ def _add_text_box(slide, left, top, width, height, text, font_size=18,
     return txBox
 
 
+def _set_slide_bg(slide, color):
+    """Set the slide background to a solid color."""
+    background = slide.background
+    fill = background.fill
+    fill.solid()
+    fill.fore_color.rgb = color
+
+
 def _add_title_slide(prs, team_name, report_title=None, report_subtitle=None):
-    """Cover slide matching SkillCorner template style."""
-    slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank layout
+    """
+    Cover slide — dark background, matching template TITLE layout.
+    Template: Chakra Petch Bold ~41pt title, 16pt subtitle in #32FE6B.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
+    _set_slide_bg(slide, SC_BG)
 
-    # Full dark background
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_BG)
-
-    # Top green accent line
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.06), SC_GREEN)
-
-    # Title
+    # Title — Chakra Petch Bold, large
     title_text = report_title if report_title else f"{team_name} Analysis Report"
     _add_text_box(slide, Inches(0.6), Inches(1.6), Inches(8.5), Inches(1.2),
-                  title_text, font_size=36, font_color=SC_WHITE, bold=True)
+                  title_text, font_size=41, font_color=SC_WHITE, bold=True)
 
     # Green accent bar under title
-    _add_filled_rect(slide, Inches(0.6), Inches(2.7), Inches(2.2),
+    _add_filled_rect(slide, Inches(0.6), Inches(2.75), Inches(2.2),
                      Inches(0.05), SC_GREEN)
 
-    # Subtitle
+    # Subtitle — Chakra Petch, #32FE6B green
     subtitle_text = report_subtitle if report_subtitle else team_name
-    _add_text_box(slide, Inches(0.6), Inches(2.95), Inches(8.5), Inches(0.8),
+    _add_text_box(slide, Inches(0.6), Inches(3.0), Inches(8.5), Inches(0.8),
                   subtitle_text, font_size=16, font_color=SC_GREEN, bold=False)
-
-    # Bottom green accent line
-    _add_filled_rect(slide, 0, SLIDE_HEIGHT - Inches(0.06), SLIDE_WIDTH,
-                     Inches(0.06), SC_GREEN)
 
 
 def _add_section_divider(prs, section_title, section_number=None):
-    """Section divider slide matching template style — large green number."""
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    """
+    Section divider — dark background, large green number + white title.
+    Template style: Chakra Petch Bold ~65-80pt number, ~34pt title.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
+    _set_slide_bg(slide, SC_BG)
 
-    # Full dark background
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_BG)
-
-    # Top + bottom green accent lines
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, Inches(0.06), SC_GREEN)
-    _add_filled_rect(slide, 0, SLIDE_HEIGHT - Inches(0.06), SLIDE_WIDTH,
-                     Inches(0.06), SC_GREEN)
-
-    # Large green section number (if provided)
+    # Large green section number
     if section_number is not None:
-        _add_text_box(slide, Inches(0.6), Inches(1.0), Inches(3), Inches(1.8),
+        _add_text_box(slide, Inches(0.6), Inches(0.8), Inches(3), Inches(1.8),
                       str(section_number).zfill(2), font_size=72,
                       font_color=SC_GREEN, bold=True)
 
-    # Section title
-    title_top = Inches(1.2) if section_number is None else Inches(2.8)
+    # Section title — Chakra Petch Bold ~34pt
+    title_top = Inches(1.2) if section_number is None else Inches(2.6)
     _add_text_box(slide, Inches(0.6), title_top, Inches(8.5), Inches(1.2),
-                  section_title, font_size=30, font_color=SC_WHITE, bold=True)
+                  section_title, font_size=34, font_color=SC_WHITE, bold=True)
 
     # Green accent bar
-    bar_top = title_top + Inches(1.3)
+    bar_top = title_top + Inches(1.2)
     _add_filled_rect(slide, Inches(0.6), bar_top, Inches(2), Inches(0.05),
                      SC_GREEN)
 
 
 def _add_content_slide(prs, title, image_path, subtitle=None):
-    """Content slide with dark header bar and image fitted to available area."""
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    """
+    Content / analysis slide — WHITE background.
 
-    # Full dark background
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT, SC_BG)
+    Matches template content slide structure:
+    - #252525 title bar at top (left=0.326in, top=0.082in, h=0.572in)
+    - Chakra Petch Bold ~23pt white title text
+    - Chakra Petch ~13pt subtitle
+    - Content starts at top=0.875in
+    - Chart/image fills the remaining white area
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[10])  # BLANK layout
 
-    # Header bar (darker strip at top)
-    header_h = Inches(0.65)
-    _add_filled_rect(slide, 0, 0, SLIDE_WIDTH, header_h, SC_BG)
+    # White slide background
+    _set_slide_bg(slide, SC_WHITE)
 
-    # Green line under header
-    _add_filled_rect(slide, 0, header_h, SLIDE_WIDTH, Inches(0.03), SC_GREEN)
+    # Title bar — #252525 filled rectangle spanning full width
+    # Template: title placeholder at (0.326in, 0.082in), h=0.572in
+    _add_filled_rect(slide, TITLE_LEFT, TITLE_TOP,
+                     Inches(9.375), TITLE_HEIGHT, SC_BG)
 
-    # Title text
-    _add_text_box(slide, Inches(0.4), Inches(0.1), Inches(9), Inches(0.45),
-                  title, font_size=18, font_color=SC_WHITE, bold=True)
+    # Green accent line under title bar
+    green_line_top = TITLE_TOP + TITLE_HEIGHT
+    _add_filled_rect(slide, TITLE_LEFT, green_line_top,
+                     Inches(9.375), Inches(0.03), SC_GREEN_LINE)
 
-    # Subtitle
+    # Title text — Chakra Petch Bold ~23pt, white
+    _add_text_box(slide, Inches(0.45), Inches(0.13), Inches(9), Inches(0.45),
+                  title, font_size=23, font_color=SC_WHITE, bold=True)
+
+    # Subtitle — Chakra Petch ~13pt, white
     if subtitle:
-        _add_text_box(slide, Inches(0.4), Inches(0.4), Inches(9),
-                      Inches(0.25), subtitle, font_size=10,
-                      font_color=SC_GREY, bold=False)
+        _add_text_box(slide, Inches(0.45), SUBTITLE_TOP,
+                      Inches(9), SUBTITLE_HEIGHT,
+                      subtitle, font_size=13, font_color=SC_WHITE, bold=False)
 
-    # Image — fitted proportionally into content area
+    # Image — fitted proportionally into white content area
     if image_path and os.path.exists(image_path):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
-        # Content area below header
-        content_top = 0.78
-        content_pad = 0.3
-        max_w = 10.0 - (content_pad * 2)  # inches
-        max_h = 5.625 - content_top - content_pad  # inches
+        # Content area: starts at CONTENT_TOP, with small padding
+        content_top_in = 0.875
+        pad = 0.2
+        max_w = 10.0 - TITLE_LEFT.inches - pad  # match title bar width
+        max_h = 5.625 - content_top_in - pad
 
-        # Proportional fit
         img_aspect = img_w / img_h
         area_aspect = max_w / max_h
 
@@ -339,12 +345,12 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             fit_h = max_h
             fit_w = max_h * img_aspect
 
-        # Centre horizontally
-        left = (10.0 - fit_w) / 2
+        # Centre horizontally within the content area
+        left = TITLE_LEFT.inches + (max_w - fit_w) / 2
 
         slide.shapes.add_picture(
             image_path,
-            Inches(left), Inches(content_top),
+            Inches(left), Inches(content_top_in),
             width=Inches(fit_w), height=Inches(fit_h),
         )
 
@@ -384,8 +390,8 @@ def generate_report(
     report_subtitle : str, optional
         Subtitle text on the title slide.
     template_path : str, optional
-        Path to a PPTX template. If provided, slide dimensions and layouts
-        are inherited from the template. All existing slides are removed.
+        Path to a SkillCorner PPTX template. Slide dimensions and theme
+        are inherited. All existing slides are removed before adding new ones.
     """
     if template_path and os.path.exists(template_path):
         prs = Presentation(template_path)
@@ -416,7 +422,6 @@ def generate_report(
             image_path = section.get("image_path", "")
             html_string = section.get("html", "")
 
-            # Render HTML to PNG if no image_path provided
             if (not image_path or not os.path.exists(image_path)) \
                     and html_string:
                 tmp_path = os.path.join(tmp_dir, f"slide_{i}.png")
