@@ -370,60 +370,81 @@ def _add_section_divider(prs, section_title, section_number=None):
               width=Inches(0.22))
 
 
+def _add_line(slide, start_left, start_top, end_left, end_top,
+              color=None, width_pt=0.75):
+    """Add a thin line (connector shape) between two points."""
+    from pptx.util import Pt as PtUtil
+    if color is None:
+        color = RGBColor(0x25, 0x25, 0x25)
+    # Use a freeform connector
+    line = slide.shapes.add_connector(
+        1,  # MSO_CONNECTOR_TYPE.STRAIGHT
+        start_left, start_top, end_left, end_top
+    )
+    line.line.color.rgb = color
+    line.line.width = PtUtil(width_pt)
+    return line
+
+
 def _add_content_slide(prs, title, image_path, subtitle=None):
     """
-    Content / analysis slide — WHITE background.
+    Content / analysis slide — clean white background.
 
-    Matches template content slide structure:
-    - #252525 title bar at top (left=0.326in, top=0.082in, h=0.572in)
-    - Chakra Petch Bold ~23pt white title text
-    - Chakra Petch ~13pt subtitle
-    - Green #32FF6A accent line under title bar
-    - Content starts at top=0.875in
-    - SC icon logo in title bar (right side)
-    - Chart/image fills the remaining white area
+    Design (from template screenshot):
+    - White background
+    - Bold black title top-left, subtitle below in regular weight
+    - Thin horizontal line from title area to right edge
+    - SKILLCORNER wordmark top-right (black)
+    - Thin vertical line on right edge
+    - Chart/image fills the remaining area
     """
-    slide = prs.slides.add_slide(_get_blank_layout(prs))  # BLANK layout
+    slide = prs.slides.add_slide(_get_blank_layout(prs))
 
     # White slide background
     _set_slide_bg(slide, SC_WHITE)
 
-    # Title bar — #252525 filled rectangle matching template position
-    title_bar_width = Inches(9.375)
-    _add_filled_rect(slide, TITLE_LEFT, TITLE_TOP,
-                     title_bar_width, TITLE_HEIGHT, SC_BG)
+    # Margins
+    left_margin = Inches(0.4)
+    right_margin = Inches(9.65)
+    line_color = SC_BG  # #252525
 
-    # Green accent line under title bar
-    green_line_top = TITLE_TOP + TITLE_HEIGHT
-    _add_filled_rect(slide, TITLE_LEFT, green_line_top,
-                     title_bar_width, Inches(0.03), SC_GREEN_LINE)
+    # Title — Chakra Petch Bold, black
+    _add_text_box(slide, left_margin, Inches(0.2), Inches(5), Inches(0.45),
+                  title, font_size=20, font_color=SC_BG, bold=True)
 
-    # Title text — Chakra Petch Bold ~23pt, white
-    _add_text_box(slide, Inches(0.45), Inches(0.13), Inches(8.5), Inches(0.45),
-                  title, font_size=23, font_color=SC_WHITE, bold=True)
-
-    # Subtitle — Chakra Petch ~13pt, white
+    # Subtitle — Chakra Petch Regular, dark grey
+    subtitle_bottom = Inches(0.55)
     if subtitle:
-        _add_text_box(slide, Inches(0.45), SUBTITLE_TOP,
-                      Inches(8.5), SUBTITLE_HEIGHT,
-                      subtitle, font_size=13, font_color=SC_WHITE, bold=False)
+        _add_text_box(slide, left_margin, Inches(0.55), Inches(5), Inches(0.25),
+                      subtitle, font_size=11, font_color=SC_GREY, bold=False)
+        subtitle_bottom = Inches(0.75)
 
-    # SC icon logo in title bar — right side
-    _add_logo(slide, LOGO_ICON,
-              TITLE_LEFT + title_bar_width - Inches(0.55),
-              TITLE_TOP + Inches(0.08),
-              height=Inches(0.4))
+    # Horizontal line — from after title area to right edge
+    line_y = Inches(0.42)
+    _add_line(slide, Inches(2.8), line_y, right_margin, line_y,
+              color=line_color, width_pt=0.75)
 
-    # Image — fitted proportionally into white content area
+    # SKILLCORNER wordmark — top-right, black text
+    _add_text_box(slide, Inches(7.8), Inches(0.18), Inches(1.8), Inches(0.35),
+                  "SKILLCORNER", font_size=10, font_color=SC_BG, bold=True,
+                  alignment=PP_ALIGN.RIGHT)
+
+    # Vertical line — right edge, from horizontal line downward
+    _add_line(slide, right_margin, line_y, right_margin, SLIDE_HEIGHT - Inches(0.3),
+              color=line_color, width_pt=0.75)
+
+    # Image — fitted proportionally into content area below title/subtitle
     if image_path and os.path.exists(image_path):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
-        # Content area: starts at CONTENT_TOP, with small padding
-        content_top_in = 0.875
-        pad = 0.15
-        max_w = 10.0 - TITLE_LEFT.inches - pad
-        max_h = 5.625 - content_top_in - pad
+        # Content area: below title, inside the vertical line
+        content_top_in = 0.85
+        pad_left = 0.4
+        pad_right = 0.5   # inside the vertical line
+        pad_bottom = 0.2
+        max_w = 9.65 - pad_left - pad_right  # stay inside vertical line
+        max_h = 5.625 - content_top_in - pad_bottom
 
         img_aspect = img_w / img_h
         area_aspect = max_w / max_h
@@ -435,8 +456,9 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             fit_h = max_h
             fit_w = max_h * img_aspect
 
-        # Centre horizontally within the content area
-        left = TITLE_LEFT.inches + (max_w - fit_w) / 2
+        # Centre horizontally in content area
+        content_centre = pad_left + max_w / 2
+        left = content_centre - fit_w / 2
 
         slide.shapes.add_picture(
             image_path,
