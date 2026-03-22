@@ -326,7 +326,7 @@ def radar_component(
 
         // --- Actual values at fixed radius just inside the outer ring ---
         const fixedValueR = yToR(95);
-        ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
         data.actuals.forEach((val, i) => {{
           if (val === null) return;
           const cAngle = canvasAngles[i];
@@ -337,19 +337,31 @@ def radar_component(
           ctx.translate(vx, vy);
           ctx.rotate(spokeRotation(mplTheta[i]));
 
+          const text = String(val);
+          const tw = ctx.measureText(text).width;
+          const pad = 3;
+
+          // White background pill instead of strokeText (avoids spiky artifacts)
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.beginPath();
+          const rr = 3;
+          const rx = -tw / 2 - pad;
+          const ry = -7;
+          const rw = tw + pad * 2;
+          const rh = 14;
+          ctx.roundRect(rx, ry, rw, rh, rr);
+          ctx.fill();
+
           ctx.fillStyle = data.text_color;
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 3;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.strokeText(String(val), 0, 0);
-          ctx.fillText(String(val), 0, 0);
+          ctx.fillText(text, 0, 0);
 
           ctx.restore();
         }});
 
         // --- Metric labels (uppercase, bold green, outside, rotated along spoke) ---
-        const labelR = ring100 + 55;
+        const labelR = ring100 + 30;
 
         data.labels.forEach((label, i) => {{
           const cAngle = canvasAngles[i];
