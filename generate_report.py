@@ -246,31 +246,64 @@ def _get_blank_layout(prs):
 
 def _add_filled_rect(slide, left, top, width, height, fill_color):
     """Add a solid-filled rectangle with no border."""
+    from pptx.oxml.ns import qn
     shape = slide.shapes.add_shape(1, left, top, width, height)
     shape.fill.solid()
     shape.fill.fore_color.rgb = fill_color
+    # Remove border completely — use XML-level noFill for Google Slides compat
     shape.line.fill.background()
+    ln = shape._element.spPr.find(qn('a:ln'))
+    if ln is None:
+        ln = shape._element.spPr.makeelement(qn('a:ln'), {})
+        shape._element.spPr.append(ln)
+    # Clear any existing fill children
+    for child in list(ln):
+        ln.remove(child)
+    ln.append(ln.makeelement(qn('a:noFill'), {}))
     return shape
 
 
 def _add_text_box(slide, left, top, width, height, text, font_size=18,
                   font_color=SC_WHITE, bold=True, alignment=PP_ALIGN.LEFT,
                   font_name='Chakra Petch'):
-    """Add a text box with specified font set at the run level."""
+    """Add a text box with font set at paragraph, run, AND XML level."""
+    from pptx.oxml.ns import qn
+
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
     p.alignment = alignment
 
-    # Use a run so font is set at run level (Google Slides ignores
-    # paragraph-level font and only reads run-level formatting)
+    # Set font at paragraph default run properties (defRPr)
+    pPr = p._p.get_or_add_pPr()
+    defRPr = pPr.find(qn('a:defRPr'))
+    if defRPr is None:
+        defRPr = pPr.makeelement(qn('a:defRPr'), {})
+        pPr.append(defRPr)
+    # Set latin font on defRPr
+    latin = defRPr.find(qn('a:latin'))
+    if latin is None:
+        latin = defRPr.makeelement(qn('a:latin'), {})
+        defRPr.append(latin)
+    latin.set('typeface', font_name)
+
+    # Set font at run level
     run = p.add_run()
     run.text = text
     run.font.size = Pt(font_size)
     run.font.color.rgb = font_color
     run.font.bold = bold
     run.font.name = font_name
+
+    # Also set latin typeface directly on the run XML for Google Slides
+    rPr = run._r.get_or_add_rPr()
+    r_latin = rPr.find(qn('a:latin'))
+    if r_latin is None:
+        r_latin = rPr.makeelement(qn('a:latin'), {})
+        rPr.append(r_latin)
+    r_latin.set('typeface', font_name)
+
     return txBox
 
 
