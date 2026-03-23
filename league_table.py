@@ -201,16 +201,25 @@ def heatmap_component(
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          font-size: 11px;
+          font-size: 13px;
+          font-weight: 600;
         }}
         .heatmap th.metric-header {{
           text-align: center;
           cursor: pointer;
           transition: background 0.2s;
           vertical-align: bottom;
-          padding: 6px 2px;
+          padding: 4px 3px;
           overflow: hidden;
           word-wrap: break-word;
+          white-space: normal;
+          line-height: 1.25;
+        }}
+        .metric-header-content {{
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }}
         .heatmap th.metric-header.dragging {{
           opacity: 0.5;
@@ -343,20 +352,20 @@ def heatmap_component(
 
           let cell_font_size, header_font_size;
           if (numMetrics <= 3) {{
+            cell_font_size = 15;
+            header_font_size = 14;
+          }} else if (numMetrics <= 5) {{
             cell_font_size = 14;
             header_font_size = 13;
-          }} else if (numMetrics <= 5) {{
+          }} else if (numMetrics <= 7) {{
             cell_font_size = 13;
             header_font_size = 12;
-          }} else if (numMetrics <= 7) {{
+          }} else if (numMetrics <= 10) {{
             cell_font_size = 12;
             header_font_size = 11;
-          }} else if (numMetrics <= 10) {{
+          }} else {{
             cell_font_size = 11;
             header_font_size = 10;
-          }} else {{
-            cell_font_size = 10;
-            header_font_size = 9;
           }}
 
           return {{ metric_col_pct, cell_font_size, header_font_size, team_name_pct }};

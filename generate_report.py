@@ -363,13 +363,9 @@ def _add_title_slide(prs, team_name, report_title=None, report_subtitle=None):
     _add_text_box(slide, Inches(0.6), Inches(1.6), Inches(8.5), Inches(1.2),
                   title_text, font_size=41, font_color=SC_WHITE, bold=True)
 
-    # Green accent bar under title
-    _add_filled_rect(slide, Inches(0.6), Inches(2.75), Inches(2.2),
-                     Inches(0.05), SC_GREEN)
-
     # Subtitle — Chakra Petch, #32FE6B green
     subtitle_text = report_subtitle if report_subtitle else team_name
-    _add_text_box(slide, Inches(0.6), Inches(3.0), Inches(8.5), Inches(0.8),
+    _add_text_box(slide, Inches(0.6), Inches(2.8), Inches(8.5), Inches(0.8),
                   subtitle_text, font_size=16, font_color=SC_GREEN, bold=False)
 
     # SC wordmark logo — bottom left (template position)
@@ -444,11 +440,11 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
-        # Content area: minimal padding, use nearly full slide
+        # Content area: padded to keep SKILLCORNER border line visible
         content_top_in = 0.65
-        pad_left = 0.1
-        pad_right = 0.15
-        pad_bottom = 0.05
+        pad_left = 0.25
+        pad_right = 0.45   # right side has vertical border line
+        pad_bottom = 0.1
         max_w = 10.0 - pad_left - pad_right
         max_h = 5.625 - content_top_in - pad_bottom
 
@@ -470,6 +466,71 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             Inches(left), Inches(content_top_in),
             width=Inches(fit_w), height=Inches(fit_h),
         )
+
+
+def _add_dual_image_slide(prs, title, left_image_path, right_image_path,
+                          left_label=None, right_label=None):
+    """
+    Content slide with two images side by side (e.g. IP + OOP radars).
+    Each image gets a label above it.
+    """
+    slide = prs.slides.add_slide(_get_blank_layout(prs))
+    _set_slide_bg(slide, SC_WHITE)
+    _add_bg_image(slide, BG_CONTENT)
+
+    # White fill behind title
+    _add_filled_rect(slide, 0, 0, Inches(10.0 / 3), Inches(0.65), SC_WHITE)
+
+    # Title
+    _add_text_box(slide, Inches(0.35), Inches(0.12), Inches(6), Inches(0.4),
+                  title, font_size=20, font_color=SC_BG, bold=True)
+
+    # Layout: two images side by side
+    content_top = 0.65
+    pad_side = 0.3
+    gap = 0.2
+    available_w = 10.0 - pad_side * 2 - gap
+    half_w = available_w / 2
+    max_h = 5.625 - content_top - 0.1
+
+    label_h = 0.3 if (left_label or right_label) else 0
+    img_top = content_top + label_h
+
+    for idx, (img_path, label) in enumerate([
+        (left_image_path, left_label),
+        (right_image_path, right_label),
+    ]):
+        x_offset = pad_side + idx * (half_w + gap)
+
+        if label:
+            _add_text_box(slide, Inches(x_offset), Inches(content_top),
+                          Inches(half_w), Inches(0.25),
+                          label, font_size=14, font_color=SC_BG, bold=True,
+                          alignment=PP_ALIGN.CENTER)
+
+        if img_path and os.path.exists(img_path):
+            with PILImage.open(img_path) as img:
+                img_w, img_h = img.size
+
+            img_max_h = max_h - label_h
+            img_aspect = img_w / img_h
+            area_aspect = half_w / img_max_h
+
+            if img_aspect > area_aspect:
+                fit_w = half_w
+                fit_h = half_w / img_aspect
+            else:
+                fit_h = img_max_h
+                fit_w = img_max_h * img_aspect
+
+            # Centre within half
+            left = x_offset + (half_w - fit_w) / 2
+
+            slide.shapes.add_picture(
+                img_path,
+                Inches(left), Inches(img_top),
+                width=Inches(fit_w), height=Inches(fit_h),
+            )
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -538,6 +599,30 @@ def generate_report(
             section_counter += 1
             _add_section_divider(prs, section.get("title", ""),
                                  section_number=section_counter)
+        elif slide_type == "dual":
+            # Dual image slide (e.g. two radars side by side)
+            def _resolve_image(key_prefix, idx):
+                img_p = section.get(f"{key_prefix}_image_path", "")
+                html_s = section.get(f"{key_prefix}_html", "")
+                if (not img_p or not os.path.exists(img_p)) and html_s:
+                    tp = os.path.join(tmp_dir, f"slide_{idx}_{key_prefix}.png")
+                    sz = section.get(f"{key_prefix}_size", (700, 700))
+                    _html_to_image(html_s, tp, size=sz)
+                    tmp_files.append(tp)
+                    return tp
+                return img_p
+
+            left_img = _resolve_image("left", i)
+            right_img = _resolve_image("right", i)
+
+            _add_dual_image_slide(
+                prs,
+                title=section.get("title", ""),
+                left_image_path=left_img,
+                right_image_path=right_img,
+                left_label=section.get("left_label", None),
+                right_label=section.get("right_label", None),
+            )
         else:
             image_path = section.get("image_path", "")
             html_string = section.get("html", "")
@@ -545,7 +630,7 @@ def generate_report(
             if (not image_path or not os.path.exists(image_path)) \
                     and html_string:
                 tmp_path = os.path.join(tmp_dir, f"slide_{i}.png")
-                size = section.get("size", (1400, 900))
+                size = section.get("size", (1400, 1100))
                 _html_to_image(html_string, tmp_path, size=size)
                 image_path = tmp_path
                 tmp_files.append(tmp_path)
