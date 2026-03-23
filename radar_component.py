@@ -129,8 +129,8 @@ def radar_component(
         }}
         .radar-container {{
           position: relative;
-          width: 900px;
-          height: 900px;
+          width: 700px;
+          height: 700px;
         }}
         canvas {{
           display: block;
@@ -139,7 +139,7 @@ def radar_component(
     </head>
     <body>
       <div class="radar-container" id="radar-container">
-        <canvas id="radar" width="900" height="900"></canvas>
+        <canvas id="radar" width="700" height="700"></canvas>
       </div>
 
       <script>
@@ -150,8 +150,8 @@ def radar_component(
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
 
-        const W = 900;
-        const H = 900;
+        const W = 700;
+        const H = 700;
         canvas.width = W * dpr;
         canvas.height = H * dpr;
         canvas.style.width = W + 'px';
@@ -164,7 +164,7 @@ def radar_component(
         // Matplotlib coordinate mapping:
         // ylim = [0, 120], bottom = 10, so bars go from r=10 to r=10+pct
         // Rings: 25th=35, 50th=60, 75th=85, 100th=110
-        const scale = 2.45;
+        const scale = 1.85;
         function yToR(y) {{ return y * scale; }}
 
         const innerR = yToR(10);        // ~24.5
@@ -344,7 +344,7 @@ def radar_component(
         }});
 
         // --- Metric labels (uppercase, bold green, outside, rotated along spoke) ---
-        const labelR = ring100 + 30;
+        const labelR = ring100 + 22;
 
         data.labels.forEach((label, i) => {{
           const cAngle = canvasAngles[i];
