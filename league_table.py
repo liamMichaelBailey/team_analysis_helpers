@@ -155,13 +155,13 @@ def heatmap_component(
           font-size: 16px;
           font-weight: bold;
           color: {text_color};
-          margin-bottom: 8px;
+          margin-bottom: 4px;
           text-align: center;
         }}
         .main-container {{
           display: flex;
           flex-direction: row;
-          gap: 15px;
+          gap: 6px;
           align-items: flex-start;
         }}
         .heatmap-section {{
@@ -172,7 +172,7 @@ def heatmap_component(
         .container {{
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 3px;
           padding-left: 0;
         }}
         .heatmap-wrapper {{
@@ -224,7 +224,7 @@ def heatmap_component(
         }}
 
         .heatmap td {{
-          height: 32px;
+          height: 28px;
           text-align: center;
           border: 1px solid #fff;
           position: relative;
@@ -246,10 +246,10 @@ def heatmap_component(
           display: flex;
           flex-direction: row;
           justify-content: center;
-          gap: 15px;
+          gap: 8px;
           font-size: 11px;
           flex-wrap: wrap;
-          padding-top: 8px;
+          padding-top: 3px;
         }}
         .legend-item {{
           display: flex;

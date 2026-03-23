@@ -259,20 +259,20 @@ def pitch_component(
         body {{
           font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           background: white;
-          padding: 10px;
+          padding: 4px;
         }}
         .title {{
           font-size: 16px;
           font-weight: bold;
           color: {text_color};
-          margin-bottom: 12px;
+          margin-bottom: 4px;
           text-align: center;
         }}
         .grid {{
           display: flex;
           flex-wrap: wrap;
-          gap: 16px;
-          justify-content: flex-start;
+          gap: 6px;
+          justify-content: center;
         }}
         .pitch-card {{
           display: flex;
@@ -281,10 +281,10 @@ def pitch_component(
           position: relative;
         }}
         .pitch-label {{
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           color: {text_color};
-          margin-bottom: 4px;
+          margin-bottom: 2px;
           text-align: center;
         }}
         .pitch-label.highlighted {{

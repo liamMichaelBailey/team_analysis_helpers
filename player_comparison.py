@@ -185,7 +185,7 @@ def ranking_component(
           font-size: 16px;
           font-weight: bold;
           color: {text_color};
-          margin-bottom: 8px;
+          margin-bottom: 3px;
           text-align: center;
         }}
         .main-container {{
@@ -219,7 +219,7 @@ def ranking_component(
         }}
         .ranking-table td {{
           padding: 0;
-          height: 28px;
+          height: 24px;
           vertical-align: middle;
           border-bottom: 1px solid #f0f0f0;
         }}
@@ -241,8 +241,8 @@ def ranking_component(
           word-wrap: break-word;
           overflow-wrap: break-word;
           width: 20%;
-          padding-top: 8px;
-          padding-bottom: 4px;
+          padding-top: 4px;
+          padding-bottom: 2px;
           border-bottom: none;
         }}
         .ranking-table td.bar-cell {{
@@ -289,10 +289,10 @@ def ranking_component(
           display: flex;
           flex-direction: row;
           justify-content: center;
-          gap: 15px;
+          gap: 8px;
           font-size: 11px;
           flex-wrap: wrap;
-          padding-top: 10px;
+          padding-top: 3px;
           width: 100%;
         }}
         .legend-item {{

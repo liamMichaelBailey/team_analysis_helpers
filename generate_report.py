@@ -158,8 +158,7 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
         '<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:'
         'wght@300;400;500;600;700&display=swap" rel="stylesheet">'
         '<style>'
-        'html, body { margin: 0; padding: 0; background: #ffffff; '
-        'overflow: hidden; } '
+        'html, body { margin: 0; padding: 0; background: #ffffff; } '
         '::-webkit-scrollbar { display: none !important; '
         'width: 0 !important; height: 0 !important; } '
         'body { font-family: "Chakra Petch", sans-serif; '
@@ -190,36 +189,36 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
 
 
 def _trim_whitespace(image_path):
-    """Crop trailing white/transparent space from bottom and right."""
+    """Crop trailing white/transparent space from bottom and right.
+    Uses a conservative threshold — only trims rows/columns that are
+    entirely white (RGB > 252 on all channels) or fully transparent."""
+    import numpy as np
+
     with PILImage.open(image_path) as img:
         img = img.convert('RGBA')
-        pixels = img.load()
-        w, h = img.size
+        arr = np.array(img)
+        h, w = arr.shape[:2]
 
-        bottom = h
-        for y in range(h - 1, -1, -1):
-            for x in range(0, w, 4):
-                r, g, b, a = pixels[x, y]
-                if a > 10 and not (r > 250 and g > 250 and b > 250):
-                    bottom = y + 2
-                    break
-            else:
-                continue
-            break
+        # A pixel is "empty" if fully transparent OR near-white
+        r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
+        has_content = (a > 10) & ~((r > 252) & (g > 252) & (b > 252))
 
-        right = w
-        for x in range(w - 1, -1, -1):
-            for y_s in range(0, h, 4):
-                r, g, b, a = pixels[x, y_s]
-                if a > 10 and not (r > 250 and g > 250 and b > 250):
-                    right = x + 2
-                    break
-            else:
-                continue
-            break
+        # Find last row/col with any content
+        row_has_content = has_content.any(axis=1)
+        col_has_content = has_content.any(axis=0)
 
-        if bottom < h - 10 or right < w - 10:
-            cropped = img.crop((0, 0, min(right, w), min(bottom, h)))
+        if not row_has_content.any():
+            return  # entirely blank image, don't touch
+
+        last_row = int(np.where(row_has_content)[0][-1])
+        last_col = int(np.where(col_has_content)[0][-1])
+
+        # Add small margin
+        bottom = min(last_row + 6, h)
+        right = min(last_col + 6, w)
+
+        if bottom < h - 20 or right < w - 20:
+            cropped = img.crop((0, 0, right, bottom))
             cropped.save(image_path)
 
 
@@ -429,7 +428,7 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
     _add_bg_image(slide, BG_CONTENT)
 
     # White fill behind title area (on top of BG overlay, under text)
-    _add_filled_rect(slide, 0, 0, Inches(7), Inches(0.65), SC_WHITE)
+    _add_filled_rect(slide, 0, 0, Inches(10.0 / 3), Inches(0.65), SC_WHITE)
 
     # Title — Chakra Petch Bold, black (#252525)
     _add_text_box(slide, Inches(0.35), Inches(0.12), Inches(6), Inches(0.4),
