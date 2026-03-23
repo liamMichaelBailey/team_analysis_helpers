@@ -159,7 +159,7 @@ def radar_component(
         ctx.scale(dpr, dpr);
 
         const cx = W / 2;
-        const cy = H / 2 + 30;
+        const cy = H / 2;
 
         // Matplotlib coordinate mapping:
         // ylim = [0, 120], bottom = 10, so bars go from r=10 to r=10+pct
@@ -385,12 +385,7 @@ def radar_component(
           ctx.restore();
         }});
 
-        // --- Title just above the top label ---
-        ctx.font = 'bold 20px Chakra Petch, -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillStyle = data.text_color;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(data.title, cx, cy - labelR - 20);
+        // Title removed — shown via PPTX slide title instead
 
         // --- Grid: no x-grid, y-grid already drawn as dashed rings ---
         // Remove polar spine (nothing to do in canvas, already clean)

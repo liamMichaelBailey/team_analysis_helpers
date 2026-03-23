@@ -458,12 +458,13 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             fit_h = max_h
             fit_w = max_h * img_aspect
 
-        # Centre horizontally on slide
+        # Centre horizontally and vertically in content area
         left = pad_left + (max_w - fit_w) / 2
+        top = content_top_in + (max_h - fit_h) / 2
 
         slide.shapes.add_picture(
             image_path,
-            Inches(left), Inches(content_top_in),
+            Inches(left), Inches(top),
             width=Inches(fit_w), height=Inches(fit_h),
         )
 
@@ -523,12 +524,13 @@ def _add_dual_image_slide(prs, title, left_image_path, right_image_path,
                 fit_h = img_max_h
                 fit_w = img_max_h * img_aspect
 
-            # Centre within half
+            # Centre horizontally and vertically within half
             left = x_offset + (half_w - fit_w) / 2
+            top = img_top + (img_max_h - fit_h) / 2
 
             slide.shapes.add_picture(
                 img_path,
-                Inches(left), Inches(img_top),
+                Inches(left), Inches(top),
                 width=Inches(fit_w), height=Inches(fit_h),
             )
 
