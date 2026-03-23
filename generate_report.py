@@ -189,7 +189,7 @@ def _html_to_image(html_string, output_path, size=(1400, 900)):
 
 
 def _trim_whitespace(image_path):
-    """Crop trailing white/transparent space from bottom and right.
+    """Crop whitespace from all four sides of an image.
     Uses a conservative threshold — only trims rows/columns that are
     entirely white (RGB > 252 on all channels) or fully transparent."""
     import numpy as np
@@ -203,22 +203,23 @@ def _trim_whitespace(image_path):
         r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
         has_content = (a > 10) & ~((r > 252) & (g > 252) & (b > 252))
 
-        # Find last row/col with any content
         row_has_content = has_content.any(axis=1)
         col_has_content = has_content.any(axis=0)
 
         if not row_has_content.any():
             return  # entirely blank image, don't touch
 
-        last_row = int(np.where(row_has_content)[0][-1])
-        last_col = int(np.where(col_has_content)[0][-1])
+        content_rows = np.where(row_has_content)[0]
+        content_cols = np.where(col_has_content)[0]
 
-        # Add small margin
-        bottom = min(last_row + 6, h)
-        right = min(last_col + 6, w)
+        first_row = max(int(content_rows[0]) - 4, 0)
+        last_row = min(int(content_rows[-1]) + 4, h)
+        first_col = max(int(content_cols[0]) - 4, 0)
+        last_col = min(int(content_cols[-1]) + 4, w)
 
-        if bottom < h - 20 or right < w - 20:
-            cropped = img.crop((0, 0, right, bottom))
+        # Only crop if we'd save meaningful space
+        if (last_row - first_row) < h - 10 or (last_col - first_col) < w - 10:
+            cropped = img.crop((first_col, first_row, last_col, last_row))
             cropped.save(image_path)
 
 
