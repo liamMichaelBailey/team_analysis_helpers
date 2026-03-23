@@ -228,9 +228,8 @@ def ranking_component(
           padding-right: 12px;
           font-size: 12px;
           color: {text_color};
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
           width: 20%;
         }}
         .ranking-table td.group-cell {{
@@ -239,9 +238,8 @@ def ranking_component(
           font-size: 13px;
           font-weight: bold;
           color: {text_color};
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
           width: 20%;
           padding-top: 8px;
           padding-bottom: 4px;

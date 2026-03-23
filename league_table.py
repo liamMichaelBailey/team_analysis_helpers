@@ -338,34 +338,28 @@ def heatmap_component(
 
         function getColumnSizing() {{
           const numMetrics = columnOrder.length;
-          // Use percentage-based widths — team name gets more space
-          const team_name_pct = numMetrics <= 5 ? 18 : 14;
+          const team_name_pct = numMetrics <= 4 ? 18 : (numMetrics <= 7 ? 15 : 13);
           const metric_col_pct = (100 - team_name_pct) / Math.max(1, numMetrics);
 
-          let cell_font_size, header_font_size, chars_per_line;
+          let cell_font_size, header_font_size;
           if (numMetrics <= 3) {{
             cell_font_size = 14;
             header_font_size = 13;
-            chars_per_line = 16;
           }} else if (numMetrics <= 5) {{
             cell_font_size = 13;
             header_font_size = 12;
-            chars_per_line = 13;
           }} else if (numMetrics <= 7) {{
             cell_font_size = 12;
             header_font_size = 11;
-            chars_per_line = 10;
           }} else if (numMetrics <= 10) {{
             cell_font_size = 11;
             header_font_size = 10;
-            chars_per_line = 8;
           }} else {{
             cell_font_size = 10;
             header_font_size = 9;
-            chars_per_line = 6;
           }}
 
-          return {{ metric_col_pct, cell_font_size, header_font_size, chars_per_line, team_name_pct }};
+          return {{ metric_col_pct, cell_font_size, header_font_size, team_name_pct }};
         }}
 
         const container = document.getElementById('heatmap-container');
@@ -408,26 +402,8 @@ def heatmap_component(
               th.classList.add('sorted');
             }}
 
-            const words = label.split(' ');
-            let lines = [];
-            let currentLine = '';
-
-            words.forEach(word => {{
-              const testLine = currentLine.length > 0 ? currentLine + ' ' + word : word;
-              if (testLine.length > sizing.chars_per_line && currentLine.length > 0) {{
-                lines.push(currentLine);
-                currentLine = word;
-              }} else {{
-                currentLine = testLine;
-              }}
-            }});
-
-            if (currentLine.length > 0) {{
-              lines.push(currentLine);
-            }}
-
-            const multiLineLabel = lines.join('<br>');
-            th.innerHTML = '<div class="metric-header-content">' + multiLineLabel + '</div>';
+            // Let CSS handle wrapping — use full column width
+            th.innerHTML = '<div class="metric-header-content" style="word-wrap:break-word;overflow-wrap:break-word;hyphens:auto;">' + label + '</div>';
 
             th.addEventListener('click', (e) => {{
               if (!th.classList.contains('dragging')) {{
@@ -486,7 +462,7 @@ def heatmap_component(
             teamCell.textContent = rowData.team;
             if (data.highlight_team && rowData.team === data.highlight_team) {{
               teamCell.style.fontWeight = 'bold';
-              teamCell.style.fontSize = '12.5px';
+              teamCell.style.fontSize = '13px';
             }}
             tr.appendChild(teamCell);
 

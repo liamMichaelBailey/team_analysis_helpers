@@ -245,21 +245,31 @@ def _get_blank_layout(prs):
 
 
 def _add_filled_rect(slide, left, top, width, height, fill_color):
-    """Add a solid-filled rectangle with no border."""
+    """Add a solid-filled rectangle with no border and no shadow."""
     from pptx.oxml.ns import qn
+    from lxml import etree
     shape = slide.shapes.add_shape(1, left, top, width, height)
     shape.fill.solid()
     shape.fill.fore_color.rgb = fill_color
-    # Remove border completely — use XML-level noFill for Google Slides compat
-    shape.line.fill.background()
-    ln = shape._element.spPr.find(qn('a:ln'))
-    if ln is None:
-        ln = shape._element.spPr.makeelement(qn('a:ln'), {})
-        shape._element.spPr.append(ln)
-    # Clear any existing fill children
-    for child in list(ln):
-        ln.remove(child)
-    ln.append(ln.makeelement(qn('a:noFill'), {}))
+    shape.shadow.inherit = False
+
+    spPr = shape._element.spPr
+
+    # Remove border completely via XML
+    ln = spPr.find(qn('a:ln'))
+    if ln is not None:
+        spPr.remove(ln)
+    ln = etree.SubElement(spPr, qn('a:ln'), w='0')
+    etree.SubElement(ln, qn('a:noFill'))
+
+    # Remove any effect list (shadows, glows, etc.)
+    for tag in [qn('a:effectLst'), qn('a:effectDag')]:
+        el = spPr.find(tag)
+        if el is not None:
+            spPr.remove(el)
+    # Add empty effectLst to explicitly disable all effects
+    etree.SubElement(spPr, qn('a:effectLst'))
+
     return shape
 
 
@@ -435,11 +445,12 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
         with PILImage.open(image_path) as img:
             img_w, img_h = img.size
 
-        # Content area: use full width, tight padding
-        content_top_in = 0.7
-        pad_h = 0.15       # horizontal padding
-        pad_bottom = 0.1   # bottom padding
-        max_w = 9.5 - pad_h  # stay inside vertical line
+        # Content area: minimal padding, use nearly full slide
+        content_top_in = 0.65
+        pad_left = 0.1
+        pad_right = 0.15
+        pad_bottom = 0.05
+        max_w = 10.0 - pad_left - pad_right
         max_h = 5.625 - content_top_in - pad_bottom
 
         img_aspect = img_w / img_h
@@ -453,7 +464,7 @@ def _add_content_slide(prs, title, image_path, subtitle=None):
             fit_w = max_h * img_aspect
 
         # Centre horizontally on slide
-        left = (9.65 - fit_w) / 2
+        left = pad_left + (max_w - fit_w) / 2
 
         slide.shapes.add_picture(
             image_path,
