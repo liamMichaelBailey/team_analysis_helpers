@@ -13,6 +13,19 @@ DEFAULT_INVERTED_HEATMAP_METRICS = [
     'conceded_shot_in_low_block_percentage',
     'progressed_to_low_block_from_medium_block_percentage',
     'progressed_to_medium_block_from_high_block_percentage',
+    'progressed_to_finish_from_high_block_percentage',
+    # Subjective negatives: less is generally better
+    'count_chaotic_phases_per_90',
+    'count_low_block_phases_per_90',
+    'count_direct_phases_per_90',
+    # Team shape: longer/wider = less compact = worse
+    'avg_length_finish',
+    'avg_length_low_block',
+    'avg_length_medium_block',
+    'avg_length_high_block',
+    'avg_width_low_block',
+    'avg_width_medium_block',
+    'avg_width_high_block',
 ]
 
 
@@ -463,19 +476,27 @@ def heatmap_component(
           table.appendChild(thead);
 
           const tbody = document.createElement('tbody');
+
           tableData.forEach((rowData, rowIdx) => {{
+            const isHighlighted = data.highlight_team && rowData.team === data.highlight_team;
             const tr = document.createElement('tr');
+
+            if (isHighlighted) {{
+              tr.style.outline = '3px solid #252525';
+              tr.style.outlineOffset = '-1px';
+              tr.style.position = 'relative';
+              tr.style.zIndex = '5';
+            }}
 
             const teamCell = document.createElement('td');
             teamCell.className = 'team-name';
             teamCell.textContent = rowData.team;
-            if (data.highlight_team && rowData.team === data.highlight_team) {{
-              teamCell.style.fontWeight = 'bold';
+            if (isHighlighted) {{
+              teamCell.style.fontWeight = '900';
               teamCell.style.fontSize = '13px';
+              teamCell.style.backgroundColor = '#f8f8f5';
             }}
             tr.appendChild(teamCell);
-
-
 
             columnOrder.forEach((originalIdx) => {{
               const zScore = rowData.matrix[originalIdx];
@@ -489,6 +510,10 @@ def heatmap_component(
 
               if (zScore !== null && zScore < -0.5) {{
                 td.style.color = '#fff';
+              }}
+
+              if (isHighlighted) {{
+                td.style.fontWeight = 'bold';
               }}
               tr.appendChild(td);
             }});

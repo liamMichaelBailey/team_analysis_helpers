@@ -30,6 +30,18 @@ POSITION_ORDER = {
     'CF': 6, 'ST': 6, 'LF': 6, 'RF': 6, 'SS': 6,
 }
 
+# Map individual positions to broader groups for within-group percentile ranking
+POSITION_GROUP = {
+    'GK': 'Goalkeeper',
+    'CB': 'Centre Back', 'LCB': 'Centre Back', 'RCB': 'Centre Back',
+    'LB': 'Full Back', 'RB': 'Full Back', 'LWB': 'Full Back', 'RWB': 'Full Back',
+    'CDM': 'Midfield', 'DM': 'Midfield', 'LDM': 'Midfield', 'RDM': 'Midfield',
+    'CM': 'Midfield', 'LCM': 'Midfield', 'RCM': 'Midfield',
+    'CAM': 'Midfield', 'LAM': 'Midfield', 'RAM': 'Midfield', 'AM': 'Midfield',
+    'LM': 'Wide Attacker', 'RM': 'Wide Attacker', 'LW': 'Wide Attacker', 'RW': 'Wide Attacker',
+    'CF': 'Centre Forward', 'ST': 'Centre Forward', 'LF': 'Centre Forward', 'RF': 'Centre Forward', 'SS': 'Centre Forward',
+}
+
 
 def ranking_component(
         df: pd.DataFrame,
@@ -84,12 +96,21 @@ def ranking_component(
     for key in questions:
         all_metrics += questions[key]
 
-    # Compute percentile ranks
-    for m in all_metrics:
-        df[m + '_pct_rank'] = df[m].rank(pct=True)
-        if m in invert_metric_ranks:
-            df[m + '_pct_rank'] = 1 - df[m + '_pct_rank']
-        df[m + '_colour'] = pd.cut(df[m + '_pct_rank'], bins=bins, labels=False, right=True)
+    # Compute percentile ranks within position group
+    if 'most_common_position' in df.columns:
+        df['_position_group'] = df['most_common_position'].map(POSITION_GROUP).fillna('Unknown')
+        for m in all_metrics:
+            df[m + '_pct_rank'] = df.groupby('_position_group')[m].rank(pct=True)
+            if m in invert_metric_ranks:
+                df[m + '_pct_rank'] = 1 - df[m + '_pct_rank']
+            df[m + '_colour'] = pd.cut(df[m + '_pct_rank'], bins=bins, labels=False, right=True)
+    else:
+        # Fallback: league-wide if no position data
+        for m in all_metrics:
+            df[m + '_pct_rank'] = df[m].rank(pct=True)
+            if m in invert_metric_ranks:
+                df[m + '_pct_rank'] = 1 - df[m + '_pct_rank']
+            df[m + '_colour'] = pd.cut(df[m + '_pct_rank'], bins=bins, labels=False, right=True)
 
     # Filter to highlighted entities and order by position
     plot_df = df[df[data_point_id].isin(highlight_group)].reset_index(drop=True)
@@ -330,6 +351,7 @@ def ranking_component(
           <div class="legend-item"><div class="legend-color" style="background:#99E59A"></div><span class="legend-label">60-80th</span></div>
           <div class="legend-item"><div class="legend-color" style="background:#00C800"></div><span class="legend-label">80-100th</span></div>
         </div>
+        <div style="text-align:center; font-size:10px; color:#888; padding-top:4px; width:100%;">Percentile ranks calculated vs. players in the same position group across the competition</div>
       </div>
 
       <script>
