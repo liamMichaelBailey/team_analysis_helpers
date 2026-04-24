@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def load_data_(credentials, bucket_name, competition_edition_id, directory=None):
+def load_data(credentials, bucket_name, competition_edition_id, directory=None):
     fs = gcsfs.GCSFileSystem(token=credentials)
     base = f"{bucket_name}/{directory}" if directory else bucket_name
 
